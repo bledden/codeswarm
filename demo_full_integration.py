@@ -15,6 +15,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from integrations import (
+    BrowserUseClient,
     OpenRouterClient,
     Neo4jRAGClient,
     WorkOSAuthClient,
@@ -32,7 +33,12 @@ def print_header(text: str, char: str = "="):
 
 
 async def main():
-    """Run full integration demo"""
+    """Run full integration demo
+
+    Usage:
+        python3 demo_full_integration.py                    # Text-only mode
+        python3 demo_full_integration.py sketch.jpg         # With vision analysis
+    """
     print_header("🐝 CODESWARM - FULL INTEGRATION DEMO", "=")
     print("This demo showcases all 6 sponsor services:")
     print("  1. OpenRouter (Anthropic) - Multi-model LLM generation")
@@ -42,6 +48,18 @@ async def main():
     print("  5. Daytona - Workspace deployment")
     print("  6. Tavily - Documentation scraping (Browser Use alternative)")
     print()
+
+    # Check for image argument
+    image_path = sys.argv[1] if len(sys.argv) > 1 else None
+    if image_path:
+        if Path(image_path).exists():
+            print(f"📷 Using sketch image: {image_path}\n")
+        else:
+            print(f"⚠️  Image not found: {image_path}")
+            print(f"    Continuing in text-only mode\n")
+            image_path = None
+    else:
+        print("💡 Tip: Pass image path for vision analysis: python3 demo_full_integration.py sketch.jpg\n")
 
     # Initialize all services
     print("⚙️  Initializing services...")
@@ -84,8 +102,9 @@ async def main():
                                     result = await workflow.execute(
                                         task="Create a secure REST API for managing user tasks with JWT authentication",
                                         user_id="demo-user-blake",
+                                        image_path=image_path,  # Vision analysis if image provided
                                         scrape_docs=True,
-                                        deploy=False  # Set to True to actually deploy
+                                        deploy=True  # Enabled for demo
                                     )
 
                                     # Print results

@@ -171,25 +171,68 @@ class BrowserUseClient:
 
             task_id = task.id
 
-            # Wait for task completion
-            max_attempts = 30
+            # Wait for task completion (fail fast to Tavily fallback if slow)
+            max_attempts = 15  # 15 attempts × 2s = 30 seconds timeout
             for attempt in range(max_attempts):
                 task_status = self.client.tasks.get_task(task_id=task_id)
 
                 if task_status.status == "completed":
+                    logger.info(f"[BROWSER_USE]  Task completed after {attempt * 2}s")
                     break
                 elif task_status.status == "failed":
                     raise Exception(f"Search task failed: {task_status.error}")
 
+                # Log progress every 5 attempts (10 seconds)
+                if attempt > 0 and attempt % 5 == 0:
+                    logger.info(f"[BROWSER_USE]  Still waiting... ({attempt * 2}s elapsed)")
+
                 await asyncio.sleep(2)
             else:
-                raise TimeoutError("Search task did not complete")
+                raise TimeoutError(f"Search task timed out after {max_attempts * 2}s (falling back to Tavily)")
 
-            # Extract URLs from result (this is a simplified implementation)
-            # In practice, you would parse the task result to extract URLs
-            # For now, return empty list
-            logger.info(f"[BROWSER_USE]  Search completed")
-            return []
+            # Extract URLs from search result
+            result_text = task_status.result or ""
+
+            # Extract URLs using regex
+            import re
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+(?:[^\s<>"{}|\\^`\[\].,;!?])'
+            found_urls = re.findall(url_pattern, result_text)
+
+            # Filter to likely documentation URLs
+            doc_keywords = ['docs', 'documentation', 'guide', 'tutorial', 'reference',
+                          'api', 'getting-started', 'quickstart', 'manual', 'learn',
+                          'developer', 'examples', 'readme']
+
+            doc_urls = []
+            for url in found_urls:
+                url_lower = url.lower()
+                # Check if URL contains documentation keywords
+                if any(keyword in url_lower for keyword in doc_keywords):
+                    # Avoid duplicate URLs
+                    if url not in doc_urls:
+                        doc_urls.append(url)
+                        if len(doc_urls) >= max_results:
+                            break
+
+            # If no documentation URLs found, try first few URLs
+            if not doc_urls and found_urls:
+                doc_urls = found_urls[:max_results]
+
+            logger.info(f"[BROWSER_USE]  Found {len(doc_urls)} documentation URLs")
+
+            # Scrape each URL
+            results = []
+            for url in doc_urls[:max_results]:
+                try:
+                    logger.info(f"[BROWSER_USE]  Scraping {url}")
+                    doc = await self.scrape_documentation(url, extract_code=True)
+                    results.append(doc)
+                except Exception as e:
+                    logger.error(f"[BROWSER_USE]  Failed to scrape {url}: {e}")
+                    continue
+
+            logger.info(f"[BROWSER_USE]  Successfully scraped {len(results)} documents")
+            return results
 
         except Exception as e:
             logger.error(f"[BROWSER_USE]  Search failed: {e}")

@@ -30,7 +30,7 @@ class VisionAgent(BaseAgent):
     def __init__(self, openrouter_client, evaluator=None):
         super().__init__(
             name="vision",
-            model="gpt-5-image",
+            model="gpt-5",  # GPT-5 supports vision natively (text, image, file inputs)
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.6,  # Balanced for creative interpretation

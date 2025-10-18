@@ -23,6 +23,7 @@ CodeSwarm demonstrates how multiple AI agents can collaborate to generate high-q
 ✅ **Safe Parallel Execution** - Concurrent agents without conflicts  
 ✅ **Full Integration** - 6 sponsor services working together  
 ✅ **Autonomous Learning** - Improves from successful outcomes  
+✅ **Interactive CLI** - Easy-to-use command-line interface
 
 ---
 
@@ -38,7 +39,7 @@ CodeSwarm demonstrates how multiple AI agents can collaborate to generate high-q
 
 \`\`\`bash
 # Clone the repository
-git clone https://github.com/yourusername/codeswarm.git
+git clone https://github.com/bledden/codeswarm.git
 cd codeswarm
 
 # Install dependencies
@@ -61,7 +62,8 @@ You'll need API keys from these services:
 6. **Tavily** (Optional) - https://tavily.com
 7. **W&B Weave** (Optional) - https://wandb.ai
 
-> See `.env.example` for all required environment variables
+> See \`.env.example\` for all required environment variables  
+> 📖 **Detailed setup**: [SETUP_GUIDE.md](SETUP_GUIDE.md)
 
 ### Verify Installation
 
@@ -82,7 +84,110 @@ Expected:
 
 ## 📖 Usage
 
-### Basic Example
+### CLI (Recommended)
+
+The easiest way to use CodeSwarm is through the CLI:
+
+\`\`\`bash
+# Generate code from a task description
+./codeswarm generate "Create a REST API for user authentication"
+
+# Generate from a sketch/image
+./codeswarm generate "Build a todo app" --image sketch.png
+
+# View configuration and stats
+./codeswarm status
+
+# View generation history
+./codeswarm history
+
+# Configure settings
+./codeswarm configure
+\`\`\`
+
+#### CLI Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `generate <task>` | Generate code from task | `./codeswarm generate "Create a chat app"` |
+| `generate <task> --image <path>` | Generate from image | `./codeswarm generate "Build UI" -i sketch.png` |
+| `generate <task> --deploy` | Generate and deploy to Daytona | `./codeswarm generate "API" --deploy` |
+| `generate <task> --no-scrape` | Skip documentation scraping | `./codeswarm generate "task" --no-scrape` |
+| `status` | Show config and stats | `./codeswarm status` |
+| `history` | Show past generations | `./codeswarm history --limit 20` |
+| `configure` | Interactive configuration | `./codeswarm configure` |
+
+#### Example Session
+
+\`\`\`bash
+$ ./codeswarm generate "Create a secure REST API for managing tasks"
+
+🐝 CODESWARM - Multi-Agent AI Coding System
+================================================================================
+
+📝 Task: Create a secure REST API for managing tasks
+
+⚙️  Initializing services...
+  ✅ OpenRouter connected
+  ✅ Neo4j connected
+  ✅ Galileo initialized
+  ✅ WorkOS initialized
+  ✅ Daytona connected
+
+🎯 5/6 services active
+
+────────────────────────────────────────────────────────────────────────────────
+  GENERATING CODE
+────────────────────────────────────────────────────────────────────────────────
+
+[1/8] 🔐 Authenticating user with WorkOS...
+      ✅ User cli-user authenticated
+
+[2/8] 🗄️  Retrieving similar patterns from Neo4j...
+      ✅ Retrieved 2 patterns (90+ quality)
+
+[3/8] 🌐 Scraping documentation with Tavily...
+      ✅ Scraped 3 docs
+
+[5/8] 🏗️  Architecture Agent (Claude Sonnet 4.5)...
+      ✅ Score: 94.0/100
+      ✅ Output: 2,340 chars
+
+[6/8] 💻 Implementation & Security (Parallel)...
+      ✅ Implementation: 96.0/100 (18,450 chars)
+      ✅ Security: 98.0/100 (12,890 chars)
+
+[7/8] 🧪 Testing Agent (Grok-4)...
+      ✅ Score: 92.0/100
+
+📊 Average Quality Score: 95.0/100
+💾 Storing pattern in Neo4j (quality: 95.0 >= 90.0)...
+✅ Pattern stored: pattern_20251018_220000
+
+────────────────────────────────────────────────────────────────────────────────
+  📊 RESULTS
+────────────────────────────────────────────────────────────────────────────────
+
+Quality Scores:
+  Architecture:    94.0/100
+  Implementation:  96.0/100
+  Security:        98.0/100
+  Testing:         92.0/100
+  ────────────────────────────────
+  Average:         95.0/100
+
+Quality Threshold: ✅ MET (90.0+)
+
+📦 Pattern stored in Neo4j: pattern_20251018_220000
+🔍 Used 2 similar patterns from RAG
+
+💾 Results saved to: output/generation_20251018_220000.json
+📁 Code files saved to: output/code_20251018_220000
+\`\`\`
+
+### Python API
+
+For programmatic access:
 
 \`\`\`python
 from integrations import OpenRouterClient, Neo4jRAGClient
@@ -107,10 +212,14 @@ async def generate_code():
             print(f"Score: {result['avg_score']:.1f}/100")
 \`\`\`
 
-### Run Full Demo
+### Demo Scripts
 
 \`\`\`bash
+# Full integration demo (all 6 services)
 python3 demo_full_integration.py
+
+# Quick service verification
+python3 test_services_quick.py
 \`\`\`
 
 ---
@@ -146,6 +255,8 @@ python3 demo_full_integration.py
 
 \`\`\`
 codeswarm/
+├── codeswarm                # CLI wrapper script
+├── codeswarm_cli.py        # CLI implementation
 ├── src/
 │   ├── agents/              # 5 specialized AI agents
 │   ├── integrations/        # Service clients
@@ -153,6 +264,8 @@ codeswarm/
 │   ├── evaluation/          # Quality assessment
 │   └── learning/            # Autonomous improvement
 ├── tests/                   # Test suite
+├── output/                  # CLI output directory
+├── cache/                   # CLI cache and history
 ├── demo_full_integration.py # Full demo
 ├── .env.example             # Environment template
 └── README.md                # This file
@@ -174,7 +287,21 @@ python3 demo_full_integration.py
 
 ## 🔧 Configuration
 
-All configuration via `.env` file. Required variables:
+### Via CLI
+
+\`\`\`bash
+./codeswarm configure
+\`\`\`
+
+Interactive prompts will let you adjust:
+- Quality threshold (default: 90)
+- Max iterations (default: 3)
+- Auto deployment (default: false)
+- Documentation scraping (default: true)
+
+### Via Environment
+
+All configuration via \`.env\` file. Required variables:
 
 \`\`\`bash
 OPENROUTER_API_KEY=your_key_here
@@ -191,6 +318,32 @@ DAYTONA_API_URL=https://app.daytona.io/api
 
 ---
 
+## 📚 Documentation
+
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Detailed setup instructions
+- **[FULL_SYSTEM_DOCUMENTATION.md](FULL_SYSTEM_DOCUMENTATION.md)** - Complete technical documentation (internal)
+- **[READY_FOR_HACKATHON.md](READY_FOR_HACKATHON.md)** - Presentation guide (internal)
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome!
+
+1. Fork the repository
+2. Create feature branch (\`git checkout -b feature/AmazingFeature\`)
+3. Commit changes (\`git commit -m 'Add AmazingFeature'\`)
+4. Push to branch (\`git push origin feature/AmazingFeature\`)
+5. Open Pull Request
+
+---
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) file
+
+---
+
 ## 🙏 Sponsors
 
 - [Anthropic](https://www.anthropic.com/) - Claude AI models
@@ -203,9 +356,22 @@ DAYTONA_API_URL=https://app.daytona.io/api
 
 ---
 
-## 📝 License
+## 💡 Tips
 
-MIT License - see [LICENSE](LICENSE) file
+**CLI Usage**:
+- Use \`./codeswarm status\` to check your current configuration
+- View \`./codeswarm history\` to see past generations and scores
+- Generated code is saved to \`output/code_<timestamp>/\` directory
+
+**Performance**:
+- Complex tasks may take 2-3 minutes
+- Use RAG patterns for faster similar tasks
+- Lower threshold for speed (but less quality)
+
+**Quality**:
+- Default 90+ threshold ensures production quality
+- Agents iterate up to 3 times to meet threshold
+- Check Galileo dashboard for detailed metrics
 
 ---
 

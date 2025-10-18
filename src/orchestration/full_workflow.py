@@ -60,6 +60,7 @@ class FullCodeSwarmWorkflow:
         galileo_evaluator: Optional[GalileoEvaluator] = None,
         workos_client: Optional[WorkOSAuthClient] = None,
         daytona_client: Optional[DaytonaClient] = None,
+        browser_use_client: Optional[Any] = None,
         quality_threshold: float = 90.0,
         max_iterations: int = 3
     ):
@@ -72,6 +73,7 @@ class FullCodeSwarmWorkflow:
             galileo_evaluator: Quality evaluator (optional)
             workos_client: Authentication client (optional)
             daytona_client: Deployment client (optional)
+            browser_use_client: Browser Use client for doc scraping (optional)
             quality_threshold: Minimum quality score (default: 90)
             max_iterations: Max improvement attempts per agent (default: 3)
         """
@@ -80,6 +82,7 @@ class FullCodeSwarmWorkflow:
         self.galileo = galileo_evaluator
         self.workos = workos_client
         self.daytona = daytona_client
+        self.browser_use = browser_use_client
 
         self.quality_threshold = quality_threshold
         self.max_iterations = max_iterations
@@ -174,12 +177,29 @@ class FullCodeSwarmWorkflow:
         # Step 3: Documentation Scraping (if requested)
         documentation = None
         if scrape_docs:
-            print("[3/8] 🌐 Scraping documentation with Tavily...")
-            documentation = await self._scrape_documentation(task)
-            if documentation:
-                print(f"      ✅ Scraped {len(documentation.get('results', []))} docs\n")
+            # Try Browser Use first (primary integration)
+            if self.browser_use:
+                print("[3/8] 🌐 Scraping documentation with Browser Use...")
+                documentation = await self._scrape_with_browser_use(task)
+                if documentation:
+                    num_docs = len(documentation.get('results', []))
+                    print(f"      ✅ Scraped {num_docs} docs with Browser Use\n")
+                else:
+                    # Fallback to Tavily if Browser Use fails
+                    print(f"      ⚠️  Browser Use scraping failed, trying Tavily fallback...")
+                    documentation = await self._scrape_with_tavily(task)
+                    if documentation:
+                        print(f"      ✅ Scraped {len(documentation.get('results', []))} docs with Tavily\n")
+                    else:
+                        print(f"      ⚠️  No documentation found\n")
             else:
-                print(f"      ⚠️  No documentation found\n")
+                # Fall back to Tavily if Browser Use not configured
+                print("[3/8] 🌐 Scraping documentation with Tavily (Browser Use not configured)...")
+                documentation = await self._scrape_with_tavily(task)
+                if documentation:
+                    print(f"      ✅ Scraped {len(documentation.get('results', []))} docs\n")
+                else:
+                    print(f"      ⚠️  No documentation found\n")
         else:
             print("[3/8] ⏭️  Documentation scraping skipped\n")
 
@@ -187,11 +207,15 @@ class FullCodeSwarmWorkflow:
         vision_analysis = None
         if image_path:
             print(f"[4/8] 👁️  Analyzing image with GPT-5 Vision...")
-            vision_output = await self.vision_agent.execute(
-                task=f"Analyze this image and describe what needs to be built: {image_path}",
-                context={"image_path": image_path},
+            vision_output = await self.vision_agent.analyze_image(
+                image_path=image_path,
+                task=task,
+                context={
+                    "rag_patterns": rag_patterns,
+                    "documentation": documentation
+                },
                 quality_threshold=self.quality_threshold,
-                max_iterations=self.max_iterations
+                max_iterations=2  # Vision needs fewer iterations
             )
             vision_analysis = vision_output.code
             print(f"      ✅ Vision analysis: {len(vision_analysis)} chars\n")
@@ -344,8 +368,46 @@ class FullCodeSwarmWorkflow:
             "timestamp": datetime.utcnow().isoformat()
         }
 
-    async def _scrape_documentation(self, task: str) -> Optional[Dict[str, Any]]:
-        """Scrape documentation using Tavily (Browser Use alternative)"""
+    async def _scrape_with_browser_use(self, task: str) -> Optional[Dict[str, Any]]:
+        """Scrape documentation using Browser Use (primary method)"""
+        if not self.browser_use:
+            return None
+
+        try:
+            # Extract keywords from task for documentation search
+            keywords = self._extract_keywords(task)
+            search_query = f"{' '.join(keywords[:5])} documentation tutorial"
+
+            # Use Browser Use to search and scrape documentation
+            results = await self.browser_use.search_and_scrape(
+                search_query=search_query,
+                max_results=3
+            )
+
+            if results:
+                # Combine results into single documentation object
+                combined_text = "\n\n".join([r.get("text", "") for r in results])
+                combined_code = []
+                for r in results:
+                    combined_code.extend(r.get("code_examples", []))
+
+                return {
+                    "source": "browser_use",
+                    "query": search_query,
+                    "text": combined_text[:50000],  # Limit total text
+                    "code_examples": combined_code[:30],  # Limit code examples
+                    "urls": [r.get("url") for r in results if r.get("url")],
+                    "results": results
+                }
+
+            return None
+
+        except Exception as e:
+            print(f"      ⚠️  Browser Use error: {e}")
+            return None
+
+    async def _scrape_with_tavily(self, task: str) -> Optional[Dict[str, Any]]:
+        """Scrape documentation using Tavily (fallback method)"""
         tavily_key = os.getenv("TAVILY_API_KEY")
         if not tavily_key:
             return None

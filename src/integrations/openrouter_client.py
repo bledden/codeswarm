@@ -34,9 +34,8 @@ class OpenRouterClient:
     MODELS = {
         # OpenAI Models
         "gpt-5-pro": "openai/gpt-5-pro",  # GPT-5 Pro (for implementation)
-        "gpt-5": "openai/gpt-5",  # GPT-5 (confirmed working in our tests)
-        "gpt-5-image": "openai/gpt-5-image",  # GPT-5 with vision (for sketch analysis)
-        "gpt-4o": "openai/gpt-4o",  # GPT-4o
+        "gpt-5": "openai/gpt-5",  # GPT-5 with vision support (text, image, file inputs)
+        "gpt-4o": "openai/gpt-4o",  # GPT-4o with vision
         "gpt-4-turbo": "openai/gpt-4o",
         "gpt-4": "openai/gpt-4",
         "gpt-3.5-turbo": "openai/gpt-3.5-turbo",

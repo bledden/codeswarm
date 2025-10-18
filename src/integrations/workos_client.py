@@ -32,13 +32,17 @@ class WorkOSAuthClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        client_id: Optional[str] = None
+        client_id: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        cookie_password: Optional[str] = None
     ):
         """Initialize WorkOS client
 
         Args:
             api_key: WorkOS API key (starts with sk_)
             client_id: WorkOS Client ID (starts with client_)
+            redirect_uri: OAuth callback URL (e.g., http://localhost:3000/callback)
+            cookie_password: 32-character password for encrypting cookies
         """
         if not WORKOS_AVAILABLE:
             raise ImportError(
@@ -49,6 +53,8 @@ class WorkOSAuthClient:
 
         self.api_key = api_key or os.getenv("WORKOS_API_KEY")
         self.client_id = client_id or os.getenv("WORKOS_CLIENT_ID")
+        self.redirect_uri = redirect_uri or os.getenv("WORKOS_REDIRECT_URI", "http://localhost:3000/callback")
+        self.cookie_password = cookie_password or os.getenv("WORKOS_COOKIE_PASSWORD")
 
         if not self.api_key or self.api_key == "your_workos_key_here":
             raise ValueError(
@@ -68,10 +74,11 @@ class WorkOSAuthClient:
         self.client = WorkOSClient(api_key=self.api_key, client_id=self.client_id)
 
         logger.info(f"[WORKOS]  Client initialized (client_id: {self.client_id[:20]}...)")
+        logger.info(f"[WORKOS]  Redirect URI: {self.redirect_uri}")
 
     def get_authorization_url(
         self,
-        redirect_uri: str,
+        redirect_uri: Optional[str] = None,
         state: Optional[str] = None,
         provider: Optional[str] = None
     ) -> str:
@@ -79,13 +86,21 @@ class WorkOSAuthClient:
         Get SSO authorization URL
 
         Args:
-            redirect_uri: Where to redirect after auth (e.g., http://localhost:3000/callback)
+            redirect_uri: Where to redirect after auth (defaults to WORKOS_REDIRECT_URI)
             state: Optional state parameter for CSRF protection
             provider: Optional provider (e.g., "GoogleOAuth", "MicrosoftOAuth")
 
         Returns:
             Authorization URL to redirect user to
         """
+        # Use instance redirect_uri if not provided
+        redirect_uri = redirect_uri or self.redirect_uri
+
+        if not redirect_uri:
+            raise ValueError(
+                "No redirect URI provided. Set WORKOS_REDIRECT_URI in .env or pass redirect_uri parameter."
+            )
+
         # Build authorization URL using WorkOS SDK
         # The SDK now handles client_id automatically
         auth_url = self.client.sso.get_authorization_url(

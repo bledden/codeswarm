@@ -103,7 +103,8 @@ class RealDemoRequest:
         await self.neo4j.verify_connection()
 
         print_agent("INIT", "Initializing Galileo...")
-        self.evaluator = GalileoEvaluator(project=f"codeswarm-demo-req{self.request_num}")
+        # Use a single project for all demo requests to track across them
+        self.evaluator = GalileoEvaluator(project="codeswarm-demo")
 
         print(f"{Colors.GREEN}All clients ready!{Colors.END}\n")
 
@@ -396,6 +397,7 @@ async def run_real_demo():
     )
     request2.openrouter = request1.openrouter
     request2.neo4j = request1.neo4j
+    request2.evaluator = request1.evaluator
 
     result2 = await request2.run()
     all_results.append(result2)
@@ -410,6 +412,7 @@ async def run_real_demo():
     )
     request3.openrouter = request1.openrouter
     request3.neo4j = request1.neo4j
+    request3.evaluator = request1.evaluator
 
     result3 = await request3.run()
     all_results.append(result3)

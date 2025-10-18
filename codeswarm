@@ -1,0 +1,6 @@
+#!/bin/bash
+# CodeSwarm CLI wrapper script
+# Allows running: codeswarm <command> instead of python3 codeswarm_cli.py <command>
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+python3 "$SCRIPT_DIR/codeswarm_cli.py" "$@"

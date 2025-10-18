@@ -1,0 +1,16 @@
+{
+  "request_num": 1,
+  "task": "Build a FastAPI user authentication endpoint with password hashing using bcrypt",
+  "timestamp": "2025-10-18T15:32:00.534975",
+  "outputs": {
+    "architecture": "/Users/bledden/Documents/codeswarm/demo_output/demo_20251018_153200/request_01/architecture.md",
+    "implementation": "/Users/bledden/Documents/codeswarm/demo_output/demo_20251018_153200/request_01/implementation.py"
+  },
+  "scores": {
+    "architecture": 97.0,
+    "implementation": 92.0
+  },
+  "patterns_retrieved": 2,
+  "avg_score": 94.5,
+  "pattern_id": "pattern_20251018_223407"
+}

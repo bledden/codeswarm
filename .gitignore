@@ -89,9 +89,27 @@ tmp/
 # Documentation with exposed API keys (should be sanitized or excluded)
 API_KEYS_INTEGRATION_STATUS.md
 ALL_SERVICES_WORKING.md
+FULL_SYSTEM_DOCUMENTATION.md
+PROJECT_STATUS.md
+CLI_VERIFICATION.md
+DEMO_GUIDE.md
+CLI_FIX_SUMMARY.md
+WEAVE_FIX_SUMMARY.md
+OUTPUT_STRUCTURE_SUMMARY.md
+CLEANUP_SUMMARY.md
 
 # Backup files
 *.bak
 *~
 docs/
-FULL_SYSTEM_DOCUMENTATION.md
+archive/
+
+# IDE history files (may contain sensitive data)
+.history/
+.vscode-history/
+
+# CLI cache and output
+cache/cli_*.json
+output/*.json
+output/code_*/
+!output/.gitkeep

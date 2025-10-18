@@ -1,0 +1,16 @@
+{
+  "request_num": 2,
+  "task": "Build authentication API with JWT access tokens and refresh tokens",
+  "timestamp": "2025-10-18T15:35:01.205805",
+  "outputs": {
+    "architecture": "/Users/bledden/Documents/codeswarm/demo_output/demo_20251018_153200/request_02/architecture.md",
+    "implementation": "/Users/bledden/Documents/codeswarm/demo_output/demo_20251018_153200/request_02/implementation.py"
+  },
+  "scores": {
+    "architecture": 97.0,
+    "implementation": 95.0
+  },
+  "patterns_retrieved": 3,
+  "avg_score": 96.0,
+  "pattern_id": "pattern_20251018_223658"
+}
