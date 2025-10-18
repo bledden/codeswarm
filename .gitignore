@@ -1,0 +1,97 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.*
+!.env.example
+
+# API Keys and credentials
+**/credentials.json
+**/*_key.txt
+**/*_secret.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Cache
+cache/
+.cache/
+*.cache
+
+# Output directories
+demo_output/*.json
+demo_output/*.txt
+!demo_output/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Neo4j
+.neo4j/
+
+# Documentation with exposed API keys (should be sanitized or excluded)
+API_KEYS_INTEGRATION_STATUS.md
+ALL_SERVICES_WORKING.md
+
+# Backup files
+*.bak
+*~
+docs/
+FULL_SYSTEM_DOCUMENTATION.md
