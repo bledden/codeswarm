@@ -144,10 +144,19 @@ class BaseAgent(ABC):
             # Evaluate with Galileo if available
             if self.evaluator:
                 try:
+                    # Get token counts from response
+                    usage = response.get("usage", {})
+                    input_tokens = usage.get("prompt_tokens", 0)
+                    output_tokens = usage.get("completion_tokens", 0)
+
                     score = await self.evaluator.evaluate(
                         task=task,
                         output=code,
-                        agent=self.name
+                        agent=self.name,
+                        model=self.model,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        latency_ms=latency_ms
                     )
                     output.galileo_score = score
                     print(f"[{self.name.upper()}]  Galileo score: {score:.1f}/100")
