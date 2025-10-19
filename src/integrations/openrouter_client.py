@@ -203,14 +203,20 @@ class OpenRouterClient:
                 json=payload
             ) as response:
                 response_data = await response.json()
-            
+
+            # CRITICAL: Check if response_data is None (transient API error)
+            if response_data is None:
+                error_msg = f"OpenRouter API returned None (HTTP {response.status}) - likely transient error"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
             if response.status != 200:
                 error_msg = response_data.get("error", {}).get("message", "Unknown error")
                 raise Exception(f"OpenRouter API error: {error_msg}")
-                
+
             # Calculate latency
             latency_ms = int((time.time() - start_time) * 1000)
-            
+
             # Extract usage information
             usage = response_data.get("usage", {})
             

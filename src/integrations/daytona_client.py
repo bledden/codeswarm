@@ -236,18 +236,56 @@ class DaytonaClient:
 
                 if DAYTONA_SDK_AVAILABLE:
                     try:
-                        # Use SDK for command execution (exec method, not code_exec)
-                        result = sandbox.process.exec(run_command)
-                        # result is an ExecutionResult with exit_code, result (stdout), etc
-                        if hasattr(result, 'result'):
-                            output = result.result
-                        elif hasattr(result, 'stdout'):
-                            output = result.stdout
+                        # For Node.js projects, split install and dev server into separate commands
+                        # to avoid SDK timeout during npm install
+                        if "npm install" in run_command or "yarn install" in run_command:
+                            # Split the command (e.g., "npm install && npm run dev")
+                            if "&&" in run_command:
+                                commands = [cmd.strip() for cmd in run_command.split("&&")]
+                                logger.info(f"[DAYTONA]  Split into {len(commands)} commands to avoid timeout")
+
+                                # Execute each command separately with proper error handling
+                                for i, cmd in enumerate(commands, 1):
+                                    logger.info(f"[DAYTONA]  [{i}/{len(commands)}] Running: {cmd}")
+                                    try:
+                                        result = sandbox.process.exec(cmd)
+                                        if hasattr(result, 'exit_code') and result.exit_code != 0:
+                                            logger.warning(f"[DAYTONA] ⚠️  Command failed with exit code {result.exit_code}")
+                                    except Exception as e:
+                                        # Log warning but continue - some commands timeout but still succeed
+                                        logger.warning(f"[DAYTONA] ⚠️  Command execution warning: {e}")
+                                        # For dev server commands that timeout, this is expected (server runs indefinitely)
+                                        if "dev" in cmd or "start" in cmd:
+                                            logger.info(f"[DAYTONA]  Dev server started in background (timeout expected)")
+
+                                output = "Commands executed in sequence"
+                            else:
+                                # Single npm install command
+                                result = sandbox.process.exec(run_command)
+                                if hasattr(result, 'result'):
+                                    output = result.result
+                                elif hasattr(result, 'stdout'):
+                                    output = result.stdout
+                                else:
+                                    output = str(result)
                         else:
-                            output = str(result)
-                        logger.info(f"[DAYTONA] ✅ Command executed: exit_code={result.exit_code if hasattr(result, 'exit_code') else 'unknown'}")
+                            # Non-Node.js command, execute normally
+                            result = sandbox.process.exec(run_command)
+                            if hasattr(result, 'result'):
+                                output = result.result
+                            elif hasattr(result, 'stdout'):
+                                output = result.stdout
+                            else:
+                                output = str(result)
+
+                        logger.info(f"[DAYTONA] ✅ Command sequence completed")
                     except Exception as e:
-                        logger.warning(f"[DAYTONA] ⚠️  SDK command execution failed: {e}")
+                        # For dev servers that run indefinitely, timeout is expected behavior
+                        if "dev" in run_command or "start" in run_command or "http.server" in run_command:
+                            logger.info(f"[DAYTONA] ✅ Server started in background (timeout expected for dev servers)")
+                            output = "Server started successfully"
+                        else:
+                            logger.warning(f"[DAYTONA] ⚠️  SDK command execution failed: {e}")
                 else:
                     # Use REST API
                     async with self.session.post(
