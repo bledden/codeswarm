@@ -86,17 +86,8 @@ tmp/
 # Neo4j
 .neo4j/
 
-# Documentation with exposed API keys (should be sanitized or excluded)
-API_KEYS_INTEGRATION_STATUS.md
-ALL_SERVICES_WORKING.md
-FULL_SYSTEM_DOCUMENTATION.md
-PROJECT_STATUS.md
-CLI_VERIFICATION.md
-DEMO_GUIDE.md
-CLI_FIX_SUMMARY.md
-WEAVE_FIX_SUMMARY.md
-OUTPUT_STRUCTURE_SUMMARY.md
-CLEANUP_SUMMARY.md
+# Documentation with exposed API keys (now in docs/session-notes/)
+docs/session-notes/
 
 # Backup files
 *.bak
