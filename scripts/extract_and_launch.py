@@ -18,14 +18,14 @@ def extract_files(implementation_file, output_dir):
     with open(implementation_file, 'r') as f:
         content = f.read()
 
-    # Find all file markers
-    file_pattern = r'^// file: (.+?)$'
+    # Find all file markers (case-insensitive for File/file)
+    file_pattern = r'^(?://|#)\s*[Ff]ile:\s*(.+?)$'
     files = re.findall(file_pattern, content, re.MULTILINE)
 
     print(f"📝 Found {len(files)} files to extract")
 
     # Split content by file markers
-    sections = re.split(r'^// file: .+?$', content, flags=re.MULTILINE)
+    sections = re.split(r'^(?://|#)\s*[Ff]ile:\s*.+?$', content, flags=re.MULTILINE)
 
     # Skip the header (before first file marker)
     sections = sections[1:]

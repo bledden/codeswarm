@@ -103,8 +103,8 @@ class LiveGenerationDemo:
 
         files = {}
 
-        # Pattern to match "// file: filename" or "# file: filename"
-        file_pattern = r'^(?://|#)\s*file:\s*(.+)$'
+        # Pattern to match "// file: filename" or "# file: filename" (case-insensitive)
+        file_pattern = r'^(?://|#)\s*[Ff]ile:\s*(.+)$'
 
         lines = code.split('\n')
         current_file = None

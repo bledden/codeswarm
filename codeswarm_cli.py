@@ -447,10 +447,10 @@ class CodeSwarmCLI:
         # Create project directory
         project_dir.mkdir(exist_ok=True)
 
-        # Parse and extract files
-        file_pattern = r'^// file: (.+?)$'
+        # Parse and extract files (case-insensitive for File/file)
+        file_pattern = r'^(?://|#)\s*[Ff]ile:\s*(.+?)$'
         files = re.findall(file_pattern, content, re.MULTILINE)
-        sections = re.split(r'^// file: .+?$', content, flags=re.MULTILINE)
+        sections = re.split(r'^(?://|#)\s*[Ff]ile:\s*.+?$', content, flags=re.MULTILINE)
         sections = sections[1:]  # Skip header
 
         extracted_count = 0
