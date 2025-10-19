@@ -332,7 +332,11 @@ class FullCodeSwarmWorkflow:
                 task
             )
             if deployment:
-                print(f"      ✅ Deployed successfully\n")
+                print(f"      ✅ Deployed successfully")
+                if deployment.get('url'):
+                    print(f"      🌐 URL: {deployment['url']}\n")
+                else:
+                    print()
         else:
             print("[8/8] ⏭️  Deployment skipped\n")
 

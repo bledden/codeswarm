@@ -1,143 +1,131 @@
 """
 Browser Use Client for Documentation Scraping
-Automated web scraping using Browser Use API
+Local browser automation using Browser Use Agent framework
 
-NOTE: Browser Use SDK requires an API key from https://browser-use.com
-This is a cloud-based browser automation service.
+NOTE: This uses the LOCAL browser-use package (Python 3.11+ required)
+NOT the cloud browser-use-sdk. Runs Playwright locally without API keys.
 """
 import os
+import sys
 from typing import Dict, Any, List, Optional
 import logging
 import asyncio
+import re
 
 logger = logging.getLogger(__name__)
 
-# Browser Use SDK requires API key
+# Check Python version
+if sys.version_info < (3, 11):
+    raise RuntimeError(
+        "Browser Use requires Python 3.11+\n"
+        f"Current version: {sys.version_info.major}.{sys.version_info.minor}\n"
+        "Please use: /opt/homebrew/bin/python3.11"
+    )
+
+# Try to import browser-use (local agent framework)
 try:
-    from browser_use_sdk import BrowserUse
+    from browser_use import Agent, Browser, ChatBrowserUse
     BROWSER_USE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     BROWSER_USE_AVAILABLE = False
-    logger.warning("[BROWSER_USE]   Package not installed. Run: pip3 install browser-use-sdk")
+    logger.warning(f"[BROWSER_USE] Package not installed: {e}")
+    logger.warning("[BROWSER_USE] Run: pip3.11 install browser-use playwright")
 
 
 class BrowserUseClient:
     """
-    Client for automated documentation scraping using Browser Use API
+    Client for automated documentation scraping using local Browser Use Agent
 
-    Uses Browser Use cloud service to:
+    Uses LOCAL Playwright browser automation (no API key needed):
     1. Scrape documentation from URLs
-    2. Extract code examples
+    2. Extract code examples and text
     3. Navigate complex documentation sites
-    4. Retrieve RAG context for code generation
+    4. Search and extract documentation URLs
     """
 
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize Browser Use client
+    def __init__(self):
+        """Initialize Browser Use client with local agent
 
-        Args:
-            api_key: Browser Use API key (or from BROWSER_USE_API_KEY env var)
+        Uses ChatBrowserUse() - browser-use's built-in LLM that gets
+        $10 free credits on signup.
         """
         if not BROWSER_USE_AVAILABLE:
             raise ImportError(
-                " BROWSER-USE SDK NOT INSTALLED!\n"
-                "Please run: pip3 install browser-use-sdk\n"
-                "See COMPLETE_SETUP_GUIDE.md Section 3 for instructions."
+                "BROWSER-USE NOT INSTALLED!\n"
+                "Requires Python 3.11+ and browser-use package.\n"
+                "Install: pip3.11 install browser-use playwright\n"
+                "Then: python3.11 -m playwright install chromium"
             )
 
-        # Check both BROWSER_USE_API_KEY and BROWSERUSE_API_KEY
-        self.api_key = api_key or os.getenv("BROWSER_USE_API_KEY") or os.getenv("BROWSERUSE_API_KEY")
+        # Use browser-use's built-in ChatBrowserUse LLM
+        # New signups get $10 free credits
+        self.llm = ChatBrowserUse()
 
-        if not self.api_key or self.api_key == "your_browser_use_key_here":
-            raise ValueError(
-                " NO BROWSER USE API KEY FOUND!\n"
-                "Please set BROWSER_USE_API_KEY or BROWSERUSE_API_KEY in .env file.\n"
-                "Get your API key from https://browser-use.com\n"
-                "See COMPLETE_SETUP_GUIDE.md Section 3 for instructions."
-            )
-
-        self.client = BrowserUse(api_key=self.api_key)
-        logger.info("[BROWSER_USE]  Client initialized with API key")
+        logger.info("[BROWSER_USE] Client initialized (LOCAL mode with ChatBrowserUse)")
 
     async def scrape_documentation(
         self,
         url: str,
         extract_code: bool = True,
-        max_depth: int = 2
+        max_depth: int = 1
     ) -> Dict[str, Any]:
         """
-        Scrape documentation from URL using Browser Use API
+        Scrape documentation from URL using local browser agent
 
         Args:
             url: Documentation URL to scrape
             extract_code: Whether to extract code examples
-            max_depth: Maximum link depth to follow (not used by SDK)
+            max_depth: Not used (kept for API compatibility)
 
         Returns:
-            Dict with {text, code_examples, links, url, scraped_at}
+            Dict with {url, text, code_examples, title, scraped_at}
         """
-        logger.info(f"[BROWSER_USE]  Scraping documentation: {url}")
+        logger.info(f"[BROWSER_USE] Scraping documentation: {url}")
 
-        # Create a task to scrape the URL
-        task_instruction = f"Navigate to {url} and extract all text content"
+        # Build task instruction
+        task = f"Navigate to {url} and extract all text content"
         if extract_code:
-            task_instruction += " and code examples"
+            task += ". Also find and extract all code examples (in code blocks, pre tags, etc)"
 
         try:
-            # Create browsing task using correct API parameters
-            task = self.client.tasks.create_task(
-                task=task_instruction,
-                start_url=url,
-                max_steps=10
+            # Create browser and agent
+            browser = Browser()
+            agent = Agent(
+                task=task,
+                llm=self.llm,
+                browser=browser
             )
 
-            task_id = task.id
-            logger.info(f"[BROWSER_USE]  Created task {task_id}")
+            # Run agent
+            result = await agent.run()
 
-            # Wait for task completion
-            max_attempts = 30
-            for attempt in range(max_attempts):
-                task_status = self.client.tasks.get_task(task_id=task_id)
+            # Extract text from result
+            result_text = str(result) if result else ""
 
-                if task_status.status == "completed":
-                    logger.info(f"[BROWSER_USE]  Task completed")
-                    break
-                elif task_status.status == "failed":
-                    raise Exception(f"Task failed: {task_status.error}")
-
-                await asyncio.sleep(2)
-            else:
-                raise TimeoutError("Task did not complete within timeout")
-
-            # Get task result
-            result_text = task_status.result or ""
-
-            # Extract code examples (simple regex-based extraction)
+            # Extract code examples using regex
             code_examples = []
             if extract_code and result_text:
-                import re
-                # Find code blocks (markdown style)
+                # Find code blocks (markdown style ```code```)
                 code_blocks = re.findall(r'```[\s\S]*?```', result_text)
-                code_examples = [block.strip('`').strip() for block in code_blocks[:20]]
+                code_examples.extend([block.strip('`').strip() for block in code_blocks])
 
-            result = {
+                # Find code in <code> or <pre> tags
+                html_code = re.findall(r'<(?:code|pre)>(.*?)</(?:code|pre)>', result_text, re.DOTALL)
+                code_examples.extend([code.strip() for code in html_code])
+
+                # Limit to 20 unique examples
+                code_examples = list(set(code_examples))[:20]
+
+            return {
                 "url": url,
                 "text": result_text[:50000],  # Limit to 50K chars
-                "code_examples": code_examples[:20],  # Limit to 20 examples
-                "links": [],  # Browser Use SDK doesn't provide links separately
-                "scraped_at": self._get_timestamp(),
-                "task_id": task_id
+                "code_examples": code_examples,
+                "title": url.split('//')[-1].split('/')[0],  # Extract domain as title
+                "scraped_at": self._get_timestamp()
             }
 
-            logger.info(
-                f"[BROWSER_USE]  Scraped {len(result_text)} chars, "
-                f"{len(code_examples)} code examples"
-            )
-
-            return result
-
         except Exception as e:
-            logger.error(f"[BROWSER_USE]  Scraping failed: {e}")
+            logger.error(f"[BROWSER_USE] Scraping failed: {e}")
             raise
 
     async def search_and_scrape(
@@ -147,58 +135,43 @@ class BrowserUseClient:
         max_results: int = 3
     ) -> List[Dict[str, Any]]:
         """
-        Search for documentation and scrape top results
+        Search for documentation and scrape top results using local browser agent
 
         Args:
             search_query: Search query (e.g., "FastAPI authentication docs")
-            search_engine: Search engine URL template
+            search_engine: Search engine URL (default: Google)
             max_results: Maximum number of results to scrape
 
         Returns:
             List of scraped documentation dictionaries
         """
-        logger.info(f"[BROWSER_USE]  Searching: {search_query}")
+        logger.info(f"[BROWSER_USE] Searching: {search_query}")
 
-        # Create a search task
-        task_instruction = f"Search Google for '{search_query}' and extract the top {max_results} result URLs"
+        # Build search task
+        search_url = search_engine + search_query.replace(' ', '+')
+        task = f"""Navigate to {search_url} and extract the top {max_results} documentation URLs.
+
+Look for URLs containing keywords like: docs, documentation, tutorial, guide, api, reference, getting-started.
+Return ONLY the URLs, one per line."""
 
         try:
-            task = self.client.tasks.create_task(
-                task=task_instruction,
-                start_url=search_engine + search_query.replace(' ', '+'),
-                max_steps=10
+            # Create browser and agent for search
+            browser = Browser()
+            agent = Agent(
+                task=task,
+                llm=self.llm,
+                browser=browser
             )
 
-            task_id = task.id
+            # Run search agent
+            result = await agent.run()
+            result_text = str(result) if result else ""
 
-            # Wait for task completion (fail fast to Tavily fallback if slow)
-            max_attempts = 15  # 15 attempts × 2s = 30 seconds timeout
-            for attempt in range(max_attempts):
-                task_status = self.client.tasks.get_task(task_id=task_id)
-
-                if task_status.status == "completed":
-                    logger.info(f"[BROWSER_USE]  Task completed after {attempt * 2}s")
-                    break
-                elif task_status.status == "failed":
-                    raise Exception(f"Search task failed: {task_status.error}")
-
-                # Log progress every 5 attempts (10 seconds)
-                if attempt > 0 and attempt % 5 == 0:
-                    logger.info(f"[BROWSER_USE]  Still waiting... ({attempt * 2}s elapsed)")
-
-                await asyncio.sleep(2)
-            else:
-                raise TimeoutError(f"Search task timed out after {max_attempts * 2}s (falling back to Tavily)")
-
-            # Extract URLs from search result
-            result_text = task_status.result or ""
-
-            # Extract URLs using regex
-            import re
+            # Extract URLs from result
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+(?:[^\s<>"{}|\\^`\[\].,;!?])'
             found_urls = re.findall(url_pattern, result_text)
 
-            # Filter to likely documentation URLs
+            # Filter to documentation URLs
             doc_keywords = ['docs', 'documentation', 'guide', 'tutorial', 'reference',
                           'api', 'getting-started', 'quickstart', 'manual', 'learn',
                           'developer', 'examples', 'readme']
@@ -206,36 +179,34 @@ class BrowserUseClient:
             doc_urls = []
             for url in found_urls:
                 url_lower = url.lower()
-                # Check if URL contains documentation keywords
                 if any(keyword in url_lower for keyword in doc_keywords):
-                    # Avoid duplicate URLs
                     if url not in doc_urls:
                         doc_urls.append(url)
                         if len(doc_urls) >= max_results:
                             break
 
-            # If no documentation URLs found, try first few URLs
+            # Fallback to first N URLs if no doc URLs found
             if not doc_urls and found_urls:
                 doc_urls = found_urls[:max_results]
 
-            logger.info(f"[BROWSER_USE]  Found {len(doc_urls)} documentation URLs")
+            logger.info(f"[BROWSER_USE] Found {len(doc_urls)} documentation URLs")
 
             # Scrape each URL
             results = []
             for url in doc_urls[:max_results]:
                 try:
-                    logger.info(f"[BROWSER_USE]  Scraping {url}")
+                    logger.info(f"[BROWSER_USE] Scraping {url}")
                     doc = await self.scrape_documentation(url, extract_code=True)
                     results.append(doc)
                 except Exception as e:
-                    logger.error(f"[BROWSER_USE]  Failed to scrape {url}: {e}")
+                    logger.error(f"[BROWSER_USE] Failed to scrape {url}: {e}")
                     continue
 
-            logger.info(f"[BROWSER_USE]  Successfully scraped {len(results)} documents")
+            logger.info(f"[BROWSER_USE] Successfully scraped {len(results)} documents")
             return results
 
         except Exception as e:
-            logger.error(f"[BROWSER_USE]  Search failed: {e}")
+            logger.error(f"[BROWSER_USE] Search failed: {e}")
             return []
 
     def _get_timestamp(self) -> str:
@@ -245,35 +216,46 @@ class BrowserUseClient:
 
 
 async def test_browser_use():
-    """Test Browser Use client"""
+    """Test Browser Use client with local agent"""
     try:
-        client = BrowserUseClient()
+        print("=" * 80)
+        print("  BROWSER USE LOCAL AGENT TEST")
+        print("=" * 80)
+        print()
 
-        # Test scraping a simple documentation page
+        client = BrowserUseClient()
+        print("✅ Client initialized (local mode)")
+        print()
+
+        # Test simple scraping
+        print("Testing: Scrape example.com...")
         result = await client.scrape_documentation(
             "https://example.com",
-            extract_code=False,
-            max_depth=1
+            extract_code=False
         )
 
-        print(" Scraped example.com")
+        print(f"✅ Scraped: {result['url']}")
         print(f"   Text: {len(result['text'])} chars")
-        print(f"   Task ID: {result['task_id']}")
+        print()
 
+        print("=" * 80)
+        print("  ✅ BROWSER USE LOCAL AGENT TEST PASSED!")
+        print("=" * 80)
         return True
 
     except ImportError as e:
-        print(f"  Browser Use SDK not installed: {e}")
-        print("   Run: pip3 install browser-use-sdk")
+        print(f"❌ Browser Use not installed: {e}")
         return False
     except ValueError as e:
-        print(f"  Browser Use API key not configured: {e}")
-        print("   Set BROWSER_USE_API_KEY in .env file")
+        print(f"❌ Configuration error: {e}")
         return False
     except Exception as e:
-        print(f" Browser Use test failed: {e}")
+        print(f"❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
 if __name__ == "__main__":
+    # Must use Python 3.11+ to run this
     asyncio.run(test_browser_use())

@@ -265,6 +265,22 @@ class CodeSwarmCLI:
         if result.get('rag_patterns_used', 0) > 0:
             print(f"🔍 Used {result['rag_patterns_used']} similar patterns from RAG")
 
+        # Display Daytona deployment info if available
+        if result.get('deployment'):
+            deployment = result['deployment']
+            print()
+            print(f"{'='*60}")
+            print("🚀 DAYTONA DEPLOYMENT".center(60))
+            print(f"{'='*60}")
+            print(f"Workspace: {deployment.get('workspace_name', 'N/A')}")
+            print(f"Status:    {deployment.get('status', 'unknown')}")
+            if deployment.get('url'):
+                print(f"URL:       {deployment['url']}")
+                print()
+                print(f"🌐 View your deployed project at:")
+                print(f"   {deployment['url']}")
+            print(f"{'='*60}")
+
         print()
         print(f"💾 Results saved to: {result['output_file']}")
         print()
