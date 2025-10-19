@@ -38,6 +38,7 @@ class DaytonaClient:
         self.api_key = api_key or os.getenv("DAYTONA_API_KEY")
         self.api_url = api_url or os.getenv("DAYTONA_API_URL", "https://api.daytona.io")
         self.workspace_id = workspace_id or os.getenv("DAYTONA_WORKSPACE_ID", "")
+        self.org_id = os.getenv("DAYTONA_ORG_ID", "")
 
         if not self.api_key or self.api_key == "your_daytona_key_here":
             raise ValueError(
@@ -50,6 +51,10 @@ class DaytonaClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+
+        # Add organization ID header if available
+        if self.org_id:
+            self.headers["X-Daytona-Organization-ID"] = self.org_id
 
         self.session: Optional[aiohttp.ClientSession] = None
 
@@ -106,24 +111,24 @@ class DaytonaClient:
 
         try:
             async with self.session.post(
-                f"{self.api_url}/workspaces",
+                f"{self.api_url}/workspace",
                 headers=self.headers,
                 json=payload
             ) as response:
-                if response.status == 201:
+                if response.status in [200, 201]:
                     data = await response.json()
                     workspace = {
                         "id": data.get("id"),
                         "name": data.get("name"),
-                        "status": data.get("status"),
-                        "url": data.get("url")
+                        "status": data.get("state") or data.get("status"),  # API uses "state"
+                        "url": None  # Will get URL from ports later
                     }
 
-                    logger.info(f"[DAYTONA]  Created workspace: {name}")
+                    logger.info(f"[DAYTONA]  Created workspace: {name} (id: {workspace['id']})")
                     return workspace
                 else:
                     error = await response.text()
-                    logger.error(f"[DAYTONA]  Failed to create workspace: {error}")
+                    logger.error(f"[DAYTONA]  Failed to create workspace (HTTP {response.status}): {error}")
                     raise Exception(f"Failed to create workspace: {error}")
 
         except Exception as e:
@@ -160,7 +165,7 @@ class DaytonaClient:
 
         try:
             async with self.session.post(
-                f"{self.api_url}/workspaces/{workspace_id}/deploy",
+                f"{self.api_url}/workspace/{workspace_id}/deploy",
                 headers=self.headers,
                 json=payload
             ) as response:
@@ -210,7 +215,7 @@ class DaytonaClient:
 
         try:
             async with self.session.post(
-                f"{self.api_url}/workspaces/{workspace_id}/run",
+                f"{self.api_url}/workspace/{workspace_id}/run",
                 headers=self.headers,
                 json=payload
             ) as response:
@@ -256,7 +261,7 @@ class DaytonaClient:
 
         try:
             async with self.session.get(
-                f"{self.api_url}/workspaces/{workspace_id}",
+                f"{self.api_url}/workspace/{workspace_id}",
                 headers=self.headers
             ) as response:
                 if response.status == 200:
@@ -291,7 +296,7 @@ class DaytonaClient:
 
         try:
             async with self.session.get(
-                f"{self.api_url}/workspaces",
+                f"{self.api_url}/workspace",
                 headers=self.headers
             ) as response:
                 if response.status == 200:
@@ -316,6 +321,46 @@ class DaytonaClient:
             logger.error(f"[DAYTONA]  Error listing workspaces: {e}")
             return []
 
+    async def get_preview_url(
+        self,
+        workspace_id: Optional[str] = None,
+        port: int = 3000
+    ) -> Optional[str]:
+        """
+        Get preview URL for a workspace port
+
+        Args:
+            workspace_id: Workspace ID (uses default if not provided)
+            port: Port number (default 3000)
+
+        Returns:
+            Preview URL string or None
+        """
+        await self.create_session_if_needed()
+
+        workspace_id = workspace_id or self.workspace_id
+        if not workspace_id:
+            raise ValueError("No workspace ID provided")
+
+        try:
+            async with self.session.get(
+                f"{self.api_url}/workspace/{workspace_id}/ports/{port}/preview-url",
+                headers=self.headers
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    url = data.get("url") or data.get("previewUrl")
+                    logger.info(f"[DAYTONA]  Got preview URL for port {port}")
+                    return url
+                else:
+                    error = await response.text()
+                    logger.warning(f"[DAYTONA]  Could not get preview URL: {error}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"[DAYTONA]  Error getting preview URL: {e}")
+            return None
+
     async def delete_workspace(
         self,
         workspace_id: Optional[str] = None
@@ -337,7 +382,7 @@ class DaytonaClient:
 
         try:
             async with self.session.delete(
-                f"{self.api_url}/workspaces/{workspace_id}",
+                f"{self.api_url}/workspace/{workspace_id}",
                 headers=self.headers
             ) as response:
                 if response.status == 204:
