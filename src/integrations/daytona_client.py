@@ -185,16 +185,22 @@ class DaytonaClient:
                 sandbox = daytona_sdk.get(workspace_id)
 
                 # Upload each file
+                upload_errors = []
                 for filepath, content in (files or {}).items():
                     try:
                         # Convert string content to bytes
                         content_bytes = content.encode('utf-8') if isinstance(content, str) else content
                         sandbox.fs.upload_file(content_bytes, filepath)
-                        logger.debug(f"[DAYTONA]  Uploaded {filepath}")
+                        logger.debug(f"[DAYTONA] ✅ Uploaded {filepath}")
                     except Exception as e:
-                        logger.warning(f"[DAYTONA]  File upload failed for {filepath}: {e}")
+                        error_msg = f"Failed to upload {filepath}: {e}"
+                        logger.error(f"[DAYTONA] ❌ {error_msg}")
+                        upload_errors.append(error_msg)
 
-                logger.info(f"[DAYTONA]  Files uploaded successfully using SDK")
+                if upload_errors:
+                    raise Exception(f"File upload failed:\n" + "\n".join(upload_errors))
+
+                logger.info(f"[DAYTONA] ✅ All {len(files)} files uploaded successfully using SDK")
             else:
                 # Fallback to REST API (multipart form-data)
                 logger.info(f"[DAYTONA]  Uploading {len(files)} files using REST API...")
@@ -230,12 +236,18 @@ class DaytonaClient:
 
                 if DAYTONA_SDK_AVAILABLE:
                     try:
-                        # Use SDK for command execution
-                        result = sandbox.process.code_exec(run_command)
-                        output = result.stdout if hasattr(result, 'stdout') else str(result)
-                        logger.info(f"[DAYTONA]  Command executed successfully using SDK")
+                        # Use SDK for command execution (exec method, not code_exec)
+                        result = sandbox.process.exec(run_command)
+                        # result is an ExecutionResult with exit_code, result (stdout), etc
+                        if hasattr(result, 'result'):
+                            output = result.result
+                        elif hasattr(result, 'stdout'):
+                            output = result.stdout
+                        else:
+                            output = str(result)
+                        logger.info(f"[DAYTONA] ✅ Command executed: exit_code={result.exit_code if hasattr(result, 'exit_code') else 'unknown'}")
                     except Exception as e:
-                        logger.warning(f"[DAYTONA]  SDK command execution failed: {e}")
+                        logger.warning(f"[DAYTONA] ⚠️  SDK command execution failed: {e}")
                 else:
                     # Use REST API
                     async with self.session.post(

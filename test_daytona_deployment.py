@@ -137,7 +137,7 @@ async def test_daytona_deployment():
         deployment = await daytona.deploy_code(
             workspace_id=workspace_id,
             files=files,
-            run_command="python3 -m http.server 3000"
+            run_command="cd /home/daytona && nohup python3 -m http.server 3000 > /tmp/server.log 2>&1 &"
         )
 
         print(f"      ✅ Deployment successful!")
