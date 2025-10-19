@@ -1,18 +1,29 @@
 #!/usr/bin/env python3.11
 """
 CodeSwarm - AI Code Generation
-Simple interactive interface for AI-powered code generation
+Command-line interface for AI-powered code generation
+
+Usage:
+  python codeswarm.py --task "create a landing page"
+  python codeswarm.py --task "make a website that looks like this image /path/to/image.jpg"
+  python codeswarm.py  # Interactive mode
 """
 import asyncio
 import sys
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
+import weave
 
 # Load environment
 load_dotenv()
+
+# Initialize Weave tracing
+weave.init(project_name="codeswarm")
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations import OpenRouterClient, Neo4jRAGClient, WorkOSAuthClient, DaytonaClient, BrowserUseClient
+from integrations import OpenRouterClient, Neo4jRAGClient, WorkOSAuthClient, DaytonaClient, TavilyClient
 from evaluation.galileo_evaluator import GalileoEvaluator
 from orchestration.full_workflow import FullCodeSwarmWorkflow
 
@@ -26,20 +37,55 @@ def print_banner():
     print()
 
 
+def parse_args():
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(
+        description="CodeSwarm - AI-powered code generation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python codeswarm.py --task "create a landing page for a coffee shop"
+  python codeswarm.py --task "make a website that looks like this image /path/to/image.jpg"
+  python codeswarm.py  # Interactive mode (prompts for task)
+        """
+    )
+
+    parser.add_argument(
+        '--task',
+        type=str,
+        help='Task description (can include image path in the text)'
+    )
+
+    parser.add_argument(
+        '--image',
+        type=str,
+        help='Path to image file for vision-based generation (optional, overrides path in task)'
+    )
+
+    return parser.parse_args()
+
+
 async def main():
-    """Run interactive code generation"""
+    """Run code generation (interactive or from command-line args)"""
+    args = parse_args()
+
     print_banner()
 
-    # Single prompt for everything
-    print("What kind of code do you need today?")
-    print()
-    print("Examples:")
-    print("  • Create a REST API for user management")
-    print("  • Build a responsive website (include image: /path/to/sketch.jpg)")
-    print("  • Make a chat application with WebSocket support")
-    print()
+    # Get task from args or prompt interactively
+    if args.task:
+        user_input = args.task
+        print(f"📝 Task: {user_input}\n")
+    else:
+        # Interactive mode - prompt user
+        print("What kind of code do you need today?")
+        print()
+        print("Examples:")
+        print("  • Create a REST API for user management")
+        print("  • Build a responsive website (include image: /path/to/sketch.jpg)")
+        print("  • Make a chat application with WebSocket support")
+        print()
 
-    user_input = input("Your request: ").strip()
+        user_input = input("Your request: ").strip()
 
     if not user_input:
         print()
@@ -50,22 +96,32 @@ async def main():
     image_path = None
     task = user_input
 
-    # Check if user included image path in their request
-    # Look for file paths (starts with / or ~/ or ./)
-    import re
-    path_match = re.search(r'(?:image:|sketch:|mockup:)?\s*([~/.]?[^\s]+\.(jpg|jpeg|png|gif|webp))', user_input, re.IGNORECASE)
-
-    if path_match:
-        potential_path = path_match.group(1)
-        expanded_path = Path(potential_path).expanduser()
-
+    # Use --image arg if provided
+    if args.image:
+        expanded_path = Path(args.image).expanduser()
         if expanded_path.exists():
             image_path = str(expanded_path)
-            # Remove the path from the task description
-            task = user_input.replace(path_match.group(0), '').strip()
-            task = re.sub(r'\s+', ' ', task)  # Clean up extra spaces
-            print()
-            print(f"✅ Found image: {image_path}")
+            print(f"✅ Using image from --image arg: {image_path}\n")
+        else:
+            print(f"⚠️  WARNING: Image file not found: {args.image}")
+            print(f"   Continuing without image...\n")
+    else:
+        # Check if user included image path in their request
+        # Look for file paths (starts with / or ~/ or ./)
+        import re
+        path_match = re.search(r'(?:image:|sketch:|mockup:)?\s*([~/.]?[^\s]+\.(jpg|jpeg|png|gif|webp))', user_input, re.IGNORECASE)
+
+        if path_match:
+            potential_path = path_match.group(1)
+            expanded_path = Path(potential_path).expanduser()
+
+            if expanded_path.exists():
+                image_path = str(expanded_path)
+                # Remove the path from the task description
+                task = user_input.replace(path_match.group(0), '').strip()
+                task = re.sub(r'\s+', ' ', task)  # Clean up extra spaces
+                print()
+                print(f"✅ Found image in task: {image_path}")
 
     print()
     print("=" * 80)
@@ -122,14 +178,14 @@ async def main():
     except Exception as e:
         print(f"  ⚠️  Daytona unavailable")
 
-    # Browser Use (optional)
-    browser_use = None
+    # Tavily AI Search (optional - primary documentation source)
+    tavily = None
     try:
-        browser_use = BrowserUseClient()
-        services_initialized.append("Browser Use")
-        print("  ✅ Browser Use")
+        tavily = TavilyClient()
+        services_initialized.append("Tavily")
+        print("  ✅ Tavily")
     except Exception as e:
-        print(f"  ⚠️  Browser Use unavailable")
+        print(f"  ⚠️  Tavily unavailable")
 
     print(f"\n🎯 {len(services_initialized)}/6 services active")
     print()
@@ -141,7 +197,7 @@ async def main():
         galileo_evaluator=galileo,
         workos_client=workos,
         daytona_client=daytona,
-        browser_use_client=browser_use,
+        tavily_client=tavily,
         quality_threshold=90.0,
         max_iterations=3
     )

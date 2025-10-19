@@ -1,0 +1,87 @@
+[Detailed technical specification of the visual design]
+
+1) Layout Structure
+- Overall Page Regions
+  - Frame: a thick border around the entire page (decorative, not interactive).
+  - Header: centered site title “BLAKE Inc.” at the top.
+  - Main/Hero: vertically centered stack containing a horizontal email sign-up form and a large smiley graphic beneath it.
+  - Footer: three equal columns aligned along the bottom labeled “Disclaimer”, “Email”, and “Social Media”.
+- Grid and Positioning
+  - Root container: max-width 1200–1280px, centered with horizontal padding 24px (mobile) / 40px (tablet+) and vertical padding 32–48px.
+  - Global grid: 12-column responsive grid (gap 24px desktop, 16px tablet, 12px mobile).
+  - Header: spans full width of container; H1 centered.
+  - Hero section:
+    - Uses a flex column layout: items centered, text centered.
+    - Vertical order: H1 (if reused here, keep only one H1 in the header), Sign-up form (inline on desktop), Smiley graphic.
+  - Footer: 3-column grid on ≥768px; stacks to single column with 16–20px gaps on small screens.
+- Decorative Background
+  - Subtle rounded-rectangle “card grid” pattern behind content (4 columns × 3 rows suggested) with very low contrast.
+  - Implement as:
+    - Option A: absolute-positioned SVG tiled pattern with 16px radius rectangles, stroke only (#E5E7EB @ 15–20% opacity).
+    - Option B: background-image using an inline SVG data URI; size ~280–320px per tile; padding so tiles don’t collide with the frame.
+- Spacing and Alignment
+  - Spacing scale: 4/8-based (4, 8, 12, 16, 24, 32, 40, 64).
+  - Header top inset: 24–32px from the inner edge of the frame.
+  - Gap between title and form: 16–24px.
+  - Gap between form and smiley: 24–40px.
+  - Footer top margin: 64–96px from hero content.
+
+2) UI Components
+- Header
+  - Brand Title: “BLAKE Inc.” as H1 (or H1 in hero and header uses role="banner" with visually same title).
+- Sign-up Form (horizontal on desktop)
+  - Email Text Input
+    - Placeholder: “Email entry”.
+    - Label (visually hidden) for accessibility: “Email address”.
+    - Leading/trailing adornments optional; no icon required per sketch.
+  - Primary Button: “Sign Up”.
+  - Inline Status Message area below input (success/error).
+- Hero Illustration
+  - Large smiley face (decorative SVG), alt="" and aria-hidden="true".
+- Footer
+  - Three link groups or single links:
+    - “Disclaimer” (to legal page or modal).
+    - “Email” (mailto: link or contact page).
+    - “Social Media” (icons/links to platforms).
+- Frame Border
+  - Decorative thick border around viewport/content area.
+- Component Hierarchy and Nesting
+  - Page
+    - Frame (pseudo-element or wrapper)
+    - Header
+      - H1: “BLAKE Inc.”
+    - Main
+      - Section: Hero
+        - Form (input + button)
+        - Status message region
+        - Smiley SVG
+      - Decorative background layer (non-interactive)
+    - Footer
+      - Grid (3 columns)
+        - Link: Disclaimer
+        - Link: Email
+        - Link group: Social icons/links
+- Component States
+  - Input
+    - Default: 1px neutral border, placeholder text.
+    - Hover: border darkens slightly.
+    - Focus: 2px focus ring, high-contrast.
+    - Error: border/error text in red; aria-invalid="true".
+    - Disabled: reduced opacity, no pointer events.
+  - Button
+    - Default: filled primary, white label.
+    - Hover: slight elevation and/or darken 4–6%.
+    - Active: pressed state, translateY(1–2px).
+    - Disabled/Loading: 60–70% opacity; spinner if loading.
+  - Links (footer)
+    - Hover: underline or color change; focus visible outline.
+
+3) Visual Design
+- Color Palette (tokens)
+  - Background: --bg: #FFFFFF (optionally #F9FAFB to show pattern).
+  - Text Primary: --text: #111827.
+  - Text Muted: --text-muted: #6B7280.
+  - Primary (CTA): --primary: #2563EB; hover #1D4ED8.
+  - Border/Lines: --line: #E5E7EB (pattern lines/strokes at low opacity).
+  - Frame Border: --frame: #0B0B0E (near-black).
+  - Success: #16A34A; Error: #DC2626; Focus ring: #93C

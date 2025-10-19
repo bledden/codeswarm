@@ -105,3 +105,11 @@ output/*.json
 output/code_*/
 !output/.gitkeep
 output/*/node_modules/
+
+# Analysis and comparison documents
+BROWSER_USE_VS_TAVILY_DEEP_DIVE.md
+END_TO_END_LATENCY_ANALYSIS.md
+VISION_AGENT_ACCURACY_ANALYSIS.md
+CODE_QUALITY_REVIEW.md
+SESSION_SUMMARY_*.md
+IMPLEMENTATION_FIXES_SUMMARY.md

@@ -322,16 +322,22 @@ class FullCodeSwarmWorkflow:
         deployment = None
         if deploy and self.daytona:
             print("[8/8] 🚀 Deploying to Daytona workspace...")
-            deployment = await self._deploy_to_daytona(
-                implementation_output.code,
-                task
-            )
-            if deployment:
-                print(f"      ✅ Deployed successfully")
-                if deployment.get('url'):
-                    print(f"      🌐 URL: {deployment['url']}\n")
-                else:
-                    print()
+
+            # Use pre-validated parsed_files from Implementation agent
+            if not implementation_output.parsed_files:
+                print(f"      ❌ ERROR: Implementation output has no parsed_files")
+                print(f"      This should never happen - Implementation agent validates files")
+            else:
+                deployment = await self._deploy_to_daytona(
+                    files=implementation_output.parsed_files,
+                    task=task
+                )
+                if deployment:
+                    print(f"      ✅ Deployed successfully")
+                    if deployment.get('url'):
+                        print(f"      🌐 URL: {deployment['url']}\n")
+                    else:
+                        print()
         else:
             print("[8/8] ⏭️  Deployment skipped\n")
 
@@ -435,10 +441,19 @@ class FullCodeSwarmWorkflow:
 
     async def _deploy_to_daytona(
         self,
-        code: str,
+        files: Dict[str, str],
         task: str
     ) -> Optional[Dict[str, Any]]:
-        """Deploy generated code to Daytona workspace"""
+        """
+        Deploy pre-validated files to Daytona workspace.
+
+        Args:
+            files: Dict of filename -> content (already parsed and validated by Implementation agent)
+            task: User's task description
+
+        Returns:
+            Deployment info with workspace_id and URL
+        """
         if not self.daytona:
             return None
 
@@ -446,12 +461,8 @@ class FullCodeSwarmWorkflow:
             # Create workspace for this task
             workspace_name = f"codeswarm-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
 
-            # Parse code into files
-            files = self._parse_code_to_files(code)
-
-            if not files:
-                print(f"      ⚠️  No files parsed from code")
-                return None
+            # Files are already parsed and validated - no need to re-parse!
+            print(f"[DEPLOY]  📦 Deploying {len(files)} pre-validated files")
 
             # Detect project type and determine appropriate run command
             run_command = self._determine_run_command(files)
@@ -551,210 +562,9 @@ class FullCodeSwarmWorkflow:
             print(f"[DEPLOY]  ⚠️  Unknown project type, using default HTTP server")
             return "python3 -m http.server 3000"
 
-    def _validate_file_imports(self, files: Dict[str, str]) -> List[Tuple[str, str]]:
-        """
-        Validate that all imported/required files actually exist in the generated code.
-
-        Returns:
-            List of (source_file, missing_import) tuples for any missing files
-        """
-        import re
-        import os
-
-        missing_files = []
-
-        # Patterns to match various import styles
-        import_patterns = [
-            # JavaScript/TypeScript: import X from "./file"
-            r'import\s+.+?\s+from\s+["\'](.+?)["\']',
-            # JavaScript: require("./file")
-            r'require\s*\(["\'](.+?)["\']\)',
-            # CSS: @import "file.css"
-            r'@import\s+["\'](.+?)["\']',
-            # Python: from module import X  (only for .py files in same project)
-            r'from\s+\.(.+?)\s+import',
-            # HTML: <link href="file.css"> or <script src="file.js">
-            r'(?:href|src)\s*=\s*["\'](.+?)["\']',
-        ]
-
-        for source_file, content in files.items():
-            # Get directory of source file for relative path resolution
-            source_dir = os.path.dirname(source_file) if '/' in source_file else ''
-
-            for pattern in import_patterns:
-                matches = re.findall(pattern, content)
-
-                for import_path in matches:
-                    # Skip external imports (URLs, node_modules, absolute packages)
-                    if any(skip in import_path for skip in [
-                        'http://', 'https://', 'node_modules', '@/',
-                        'react', 'vue', 'next', 'vite', 'express'
-                    ]):
-                        continue
-
-                    # Skip absolute imports (e.g., Python standard library)
-                    if not import_path.startswith('.') and not import_path.startswith('/'):
-                        # Unless it's a local file reference in HTML
-                        if source_file.endswith('.html') and not import_path.startswith('http'):
-                            pass  # Check these
-                        else:
-                            continue
-
-                    # Resolve relative path
-                    if import_path.startswith('./') or import_path.startswith('../'):
-                        # Remove ./ or ../
-                        clean_path = import_path
-                        if source_dir:
-                            # Resolve relative to source file directory
-                            full_path = os.path.normpath(os.path.join(source_dir, import_path))
-                        else:
-                            full_path = import_path.lstrip('./')
-                    else:
-                        full_path = import_path
-
-                    # Add common extensions if not present
-                    possible_paths = [full_path]
-                    if not any(full_path.endswith(ext) for ext in ['.js', '.jsx', '.ts', '.tsx', '.css', '.py']):
-                        possible_paths.extend([
-                            f"{full_path}.js",
-                            f"{full_path}.jsx",
-                            f"{full_path}.ts",
-                            f"{full_path}.tsx",
-                            f"{full_path}/index.js",
-                            f"{full_path}/index.jsx",
-                        ])
-
-                    # Check if any variant exists in generated files
-                    found = False
-                    for possible_path in possible_paths:
-                        # Normalize path separators
-                        normalized_path = possible_path.replace('\\', '/')
-
-                        # Check exact match or with src/ prefix
-                        if normalized_path in files or f"src/{normalized_path}" in files:
-                            found = True
-                            break
-
-                        # Check without leading ./ or src/
-                        check_paths = [
-                            normalized_path.lstrip('./'),
-                            normalized_path.lstrip('src/'),
-                            f"src/{normalized_path.lstrip('./')}"
-                        ]
-
-                        if any(cp in files for cp in check_paths):
-                            found = True
-                            break
-
-                    if not found:
-                        # Only report if it looks like a local file import
-                        if import_path.startswith('.') or (
-                            source_file.endswith('.html') and
-                            not import_path.startswith('http') and
-                            any(import_path.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.svg'])
-                        ):
-                            missing_files.append((source_file, import_path))
-
-        return missing_files
-
-    def _parse_code_to_files(self, code: str) -> Dict[str, str]:
-        """
-        Parse generated code into individual files
-
-        Handles markers like:
-        - # File: src/index.html
-        - // File: app.js
-        - # file: package.json
-        - /* File: styles.css */
-
-        Supports ALL common file types:
-        - Web: .html, .css, .js, .jsx, .ts, .tsx, .vue, .svelte
-        - Backend: .py, .java, .go, .rs, .c, .cpp, .cs, .php, .rb
-        - Config: .json, .yaml, .yml, .toml, .xml, .ini, .env
-        - Databases: .sql
-        - Mobile: .dart, .swift, .kt
-        - Other: .md, .txt, Dockerfile, Makefile
-        - Directories: public, src, dist, build (no extension)
-        """
-        import re
-
-        print(f"[DEPLOY]  🔍 DEBUG: Starting file parsing...")
-        print(f"[DEPLOY]  🔍 DEBUG: Code length: {len(code)} chars")
-        print(f"[DEPLOY]  🔍 DEBUG: First 200 chars: {code[:200]}")
-
-        files = {}
-
-        # Enhanced pattern to match file markers with multiple comment styles
-        # Matches: "# File:", "// File:", "/* File: */", case-insensitive
-        file_pattern = r'^(?://|#|/\*)\s*[Ff]ile:\s*(.+?)(?:\s*\*/)?$'
-
-        lines = code.split('\n')
-        current_file = None
-        current_content = []
-
-        for line in lines:
-            # Check if this line is a file marker
-            match = re.match(file_pattern, line.strip())
-            if match:
-                # Save previous file
-                if current_file and current_content:
-                    content = '\n'.join(current_content).strip()
-                    if content:  # Only save non-empty files
-                        files[current_file] = content
-                    else:
-                        print(f"[DEPLOY]  ⚠️  Skipping empty file: {current_file}")
-
-                # Start new file
-                current_file = match.group(1).strip()
-                current_content = []
-
-                print(f"[DEPLOY]  📄 Extracted: {current_file}")
-            elif current_file:
-                current_content.append(line)
-
-        # Save last file
-        if current_file and current_content:
-            content = '\n'.join(current_content).strip()
-            if content:
-                files[current_file] = content
-            else:
-                print(f"[DEPLOY]  ⚠️  Skipping empty file: {current_file}")
-
-        # Validation and reporting
-        if files:
-            print(f"[DEPLOY]  ✅ Total: {len(files)} files extracted")
-
-            # Validate file paths
-            for filepath in list(files.keys()):  # Use list() to avoid RuntimeError
-                # Check for suspicious patterns
-                if filepath.startswith("File:") or filepath.startswith("file:"):
-                    print(f"[DEPLOY]  ⚠️  WARNING: Malformed path '{filepath}' - may have parsing issue")
-
-                # Validate no absolute paths (security)
-                if filepath.startswith("/") or (len(filepath) > 1 and filepath[1] == ":"):
-                    print(f"[DEPLOY]  ⚠️  WARNING: Absolute path detected '{filepath}' - converting to relative")
-                    # Remove leading slash or drive letter
-                    filepath_clean = filepath.lstrip("/").split(":", 1)[-1].lstrip("/")
-                    files[filepath_clean] = files.pop(filepath)
-
-            # CRITICAL: Validate that all imported files exist
-            missing_files = self._validate_file_imports(files)
-            if missing_files:
-                print(f"[DEPLOY]  ❌ CRITICAL: Found {len(missing_files)} missing file references!")
-                for source_file, missing_import in missing_files:
-                    print(f"[DEPLOY]      {source_file} references missing file: {missing_import}")
-                raise ValueError(
-                    f"Implementation generated incomplete code with {len(missing_files)} missing file references. "
-                    f"Agent needs to retry and generate ALL files referenced in imports."
-                )
-        else:
-            print(f"[DEPLOY]  ❌ ERROR: No files extracted from generated code!")
-            print(f"[DEPLOY]  Expected file markers like: '# File: path/to/file.ext'")
-            print(f"[DEPLOY]  Code preview (first 500 chars):\n{code[:500]}")
-            raise ValueError("File parsing failed - no files extracted from implementation output")
-
-        return files
-
+    # NOTE: File parsing and validation moved to ImplementationAgent
+    # Files are now parsed and validated during Implementation agent execution,
+    # with automatic retry if validation fails. This prevents deployment of broken code.
     def _extract_keywords(self, text: str) -> List[str]:
         """Extract keywords from text"""
         stop_words = {"a", "an", "the", "in", "on", "at", "for", "to", "of", "and", "or", "with"}

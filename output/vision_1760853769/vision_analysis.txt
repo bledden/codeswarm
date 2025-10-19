@@ -1,0 +1,120 @@
+[Detailed technical specification of the visual design]
+1) Layout Structure
+- Overall page regions
+  - header: centered brand/title “BLAKE Inc.”
+  - main: hero block with email capture form and a large central illustration (smiley)
+  - footer: three evenly spaced items/links: Disclaimer, Email, Social Media
+- Page container
+  - width: 100%; max-width: 1200px (desktop)
+  - horizontal padding: 24px mobile, 32px tablet, 48px desktop
+  - vertical gaps between sections: 32px mobile, 48px tablet, 64px desktop
+- Optional frame border (to mimic sketch)
+  - outer padding: 16px around the entire canvas
+  - border: 8px solid #111111; radius: 12px; applied to a wrapper that sits behind the content
+- Grid/flex
+  - use a 12-column responsive grid (content centered)
+  - header: single column, center-aligned
+  - hero: vertical stack; email form as a horizontal flex row on ≥640px, stacked on <640px
+    - gap between input and button: 12px mobile, 16px desktop
+  - footer: 3-column grid (equal columns) on ≥768px; stacked list on mobile with 12–16px gap
+- Alignment
+  - all text center-aligned in header and hero
+  - footer items center-aligned on mobile; left/center/right alignment optional on desktop (spec default: centered within each column)
+- Spacing targets
+  - header top padding: 48px mobile, 64px desktop
+  - space from title to form: 24px mobile, 32px desktop
+  - space from form to illustration: 24–32px
+  - footer top padding: 48px; bottom padding: 48px
+
+2) UI Components
+- AppShell
+  - children: Header, Main/Hero, Footer, Toast/Alert region (aria-live)
+- Header
+  - BrandTitle: text “BLAKE Inc.” (no nav in mock)
+- Hero
+  - EmailCaptureForm (inline)
+    - Label (visually hidden): “Email address”
+    - TextInput (placeholder: “Email”) — labeled “Email Entry” in sketch
+    - PrimaryButton — “Sign Up”
+  - Illustration
+    - Smiley SVG centered; size responsive (160px mobile, 240px tablet, 320px desktop)
+- Footer
+  - FooterNav (3 items)
+    - Link: Disclaimer
+    - Link: Email (mailto:contact@blake.inc)
+    - Link: Social Media (opens external profiles)
+- Feedback/Utility
+  - Toast/Alert for success/error (non-blocking)
+  - FormFieldError text under input when invalid
+- Component hierarchy and nesting
+  - AppShell
+    - Header
+      - BrandTitle
+    - Main
+      - Hero
+        - EmailCaptureForm
+          - Label
+          - TextInput
+          - PrimaryButton
+        - Illustration
+    - Footer
+      - FooterNav
+        - FooterLink (x3)
+    - ToastRegion
+- Component states
+  - TextInput
+    - default: 1px border neutral-300, placeholder neutral-500
+    - focus: 2px focus ring accent-400/500, border accent-500
+    - invalid: border error-600; helper text visible; aria-invalid="true"
+    - disabled: bg neutral-100; text neutral-400
+  - PrimaryButton
+    - default: accent-600 bg, white text
+    - hover: accent-700 bg
+    - active: accent-800 bg, translateY(1px)
+    - focus-visible: 2px outline accent-300 + 2px offset
+    - disabled: accent-300 bg, cursor not-allowed, reduced elevation
+    - loading (optional): spinner left of label; aria-busy="true"
+  - FooterLink
+    - hover: underline; color transitions to neutral-800 or accent-600
+    - focus-visible: outline 2px accent
+
+3) Visual Design
+- Color palette (WCAG-compliant targets)
+  - background: #FFFFFF
+  - text-primary: #111827 (Gray 900)
+  - text-secondary: #4B5563 (Gray 600)
+  - border: #E5E7EB (Gray 200) inputs/cards
+  - accent-primary (CTA/button): #2563EB (Blue 600)
+  - accent-hover: #1D4ED8 (Blue 700)
+  - focus-ring: #93C5FD (Blue 300) on a 2px outline
+  - error: #DC2626 (Red 600)
+  - optional frame border: #111111
+- Typography
+  - font family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial
+  - Title (BLAKE Inc.): 48px/56px (mobile 36px/44px), weight 700
+  - Body/base: 16px/24px, weight 400
+  - Button label: 16px/24px, weight 600
+  - Footer links: 14–16px/22–24px, weight 500
+- Icons and images
+  - Smiley illustration: inline SVG (stroke 2–3px, color neutral-400 or accent-400)
+  - Favicons/social icons: SVG from a reputable set (Heroicons, Lucide)
+- Borders, radius, shadows
+  - input/button radius: 8px
+  - button shadow: 0 1px 2px rgba(0,0,0,0.05), hover 0 2px 6px rgba(0,0,0,0.08)
+  - input shadow on focus: 0 0 0 4px rgba(147,197,253,0.5) (focus ring)
+  - global frame border (optional): radius 12px; shadow 0 6px 24px rgba(0,0,0,0.08) if border omitted
+
+4) Interactions
+- Email capture
+  - typing: input masked as email with type="email", autocomplete="email"
+  - submit: clicking Sign Up or pressing Enter
+  - validation:
+    - client-side: HTML5 + schema (RFC 5322 basic) with messaging: “Enter a valid email address”
+    - server-side: verify MX pattern or send to API; on conflict show “This email is already subscribed”
+  - success: show toast “Thanks! Check your inbox to confirm.” and clear input; move focus to toast (aria-live="polite")
+- Footer links
+  - Disclaimer: navigate to /disclaimer
+  - Email: mailto:contact@blake.inc
+  - Social Media: open new tab with rel="noopener"
+- Keyboard interactions
+  - Tab order:

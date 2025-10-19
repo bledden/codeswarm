@@ -1,0 +1,120 @@
+[Detailed technical specification of the visual design]
+Name: Blake Inc. Landing Page (single-screen hero with email sign-up)
+
+1) Layout Structure
+- Landmarks: <header> (logo/title), <main> (hero with CTA + illustration), <footer> (3 links: Disclaimer, Email, Social Media)
+- Canvas: Centered, max-content width 1200px inside full-bleed page. Vertical flow top-to-bottom.
+- Grid: 12-column responsive grid on ≥1024px, 24px gutters. On <1024px, switch to a single-column stack with intrinsic spacing.
+- Frame: Decorative dark border around entire page (16–24px thick) with 12–16px corner radius; non-interactive and not part of content flow. Use ::before pseudo-element to avoid interfering with layout.
+- Background pattern: Subtle rounded-rectangle grid tiles (like 4 columns x 3 rows) as a low-contrast pattern behind content. Implement as an SVG/CSS background with 8–12px radius per tile and 1px strokes at 4–6% opacity.
+
+Section specs (desktop):
+- Header (height ~96px):
+  - Content centered horizontally.
+  - H1 “BLAKE Inc.” centered.
+  - Padding: 24px top/bottom, 24px left/right.
+- Hero:
+  - Vertical stack centered; width clamp(320px, 80vw, 800px).
+  - Spacing: H1 to form 24px; form to illustration 32–48px.
+  - CTA Form row: input (flex: 1) left, button right; 12–16px gap.
+- Illustration area:
+  - Centered circular smiley SVG, size ~280–360px diameter desktop; scales down to 160–220px on mobile.
+- Footer (height auto):
+  - Three columns horizontally spaced: Disclaimer | Email | Social Media.
+  - On mobile, stack vertically with 12–16px spacing.
+  - Padding: 32px top, 24px bottom.
+  - Content alignment: center on mobile; space-between on desktop within max-width container.
+
+Spacing scale (px): 4, 8, 12, 16, 24, 32, 48, 64. Use 24 as primary vertical rhythm.
+
+2) UI Components
+- HeaderTitle
+  - Element: <h1> with brand text “BLAKE Inc.”
+  - Variants: default only.
+- CTAForm
+  - Container: <form role="form" aria-labelledby="signup-title"> stacked on mobile, inline row on desktop.
+  - EmailInput
+    - Element: <input type="email" id="email" name="email" placeholder="Enter your email">
+    - States: default, hover, focus (visible focus ring), valid, invalid (red border + helper text), disabled, loading (readOnly).
+  - SignUpButton
+    - Element: <button type="submit">Sign Up</button>
+    - States: default, hover, active, focus-visible, disabled, loading (spinner, aria-busy).
+- Illustration
+  - Element: Inline SVG smiley in a circle; decorative on desktop but supply role="img" with alt="" if purely decorative, or alt="Smiling face" if needed for meaning. Size responsive.
+- FooterLinks
+  - DisclaimerLink: <a href="/disclaimer">Disclaimer</a> (or triggers modal).
+  - EmailLink: <a href="mailto:contact@blake.inc">Email</a>.
+  - SocialLinks: icon buttons/links to platforms (open in new tab with rel="noopener noreferrer").
+  - States: default, hover (color change), focus-visible (outline), active.
+
+Component hierarchy and nesting:
+<App>
+  <FrameBackground />  // decorative frame and tile grid
+  <Header>
+    <HeaderTitle />
+  </Header>
+  <Main>
+    <Hero>
+      <CTAForm>
+        <EmailInput />
+        <SignUpButton />
+      </CTAForm>
+      <Illustration />
+    </Hero>
+  </Main>
+  <Footer>
+    <FooterLinks>
+      <DisclaimerLink />
+      <EmailLink />
+      <SocialLinks />
+    </FooterLinks>
+  </Footer>
+</App>
+
+3) Visual Design
+- Color tokens (WCAG AA capable):
+  --color-bg: #FFFFFF
+  --color-text: #111827   // Gray-900
+  --color-muted: #6B7280  // Gray-500
+  --color-border: #E5E7EB // Gray-200
+  --color-accent: #2563EB // Blue-600 for CTA
+  --color-accent-hover: #1D4ED8 // Blue-700
+  --color-accent-contrast: #FFFFFF
+  --color-danger: #DC2626 // validation error
+  --color-frame: #0F172A  // near-black frame
+  --color-grid-lines: rgba(17,24,39,0.06) // faint tile outlines
+- Typography
+  - Family: "Inter", "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif.
+  - H1 (brand): 48–56px, weight 700, letter-spacing -0.01em, line-height 1.1.
+  - Body: 16px, weight 400, line-height 1.5.
+  - Button: 16px, weight 600.
+  - Footer links: 14–16px, weight 500.
+- Icons/Images
+  - Smiley: simple line SVG (2px stroke, circle + eyes + curve). Color: --color-text at 70% opacity (#111827B3).
+  - Social icons: SVGs sized 20–24px, currentColor fill.
+- Surfaces and effects
+  - Input: 1px solid --color-border; 8px radius; background #FFFFFF; focus ring 2px #BFDBFE at 2px offset.
+  - Button: 10–12px radius; solid fill --color-accent; shadow subtle: 0 1px 2px rgba(0,0,0,0.08); hover darken; active translateY(1px).
+  - Frame: 16–24px solid border; radius 12–16px; inset from viewport by 12–16px using padding.
+  - Background tiles: rounded 12px rectangles as pattern; do not reduce contrast of content.
+
+4) Interactions
+- Sign Up flow
+  - Clicking Sign Up submits CTAForm.
+  - Client-side validation: email required; RFC 5322 regex or browser built-in via type="email".
+  - On invalid: show inline error text below input (14px, --color-danger) and aria-live="polite".
+  - On submit (valid):
+    - Disable input and button; button shows spinner and aria-busy="true".
+    - POST /api/subscribe { email }.
+    - Success: replace form with success message “Thanks—check your inbox” and optional confetti/smiley bounce. Focus moves to message container.
+    - Failure: show error message; re-enable controls; focus moves to input.
+- Navigation
+  - Disclaimer: opens /disclaimer page or modal with scroll-lock and close on Esc; focus trap in modal.
+  - Social links: open in new tab; announce via visually hidden "(opens in a new tab)".
+  - Email link: opens default mail client (mailto).
+- Hover/focus
+  - Links: underline on hover, persistent underline on focus-visible.
+  - Button: color shift to --color-accent-hover; focus ring 2px offset.
+- Animations
+  - Reduce motion: respect prefers-reduced-motion; disable bounce/confetti.
+  - Smiley:

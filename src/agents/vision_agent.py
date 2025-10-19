@@ -198,6 +198,31 @@ Provide a comprehensive technical specification that architecture and implementa
         print(f"[{self.name.upper()}]  Vision analysis complete ({latency_ms}ms)")
         print(f"[{self.name.upper()}]  Analysis length: {len(content)} characters")
 
+        # Log vision analysis output for debugging and quality tracking
+        if content:
+            print(f"\n{'='*80}")
+            print(f"[{self.name.upper()}] VISION ANALYSIS OUTPUT:")
+            print(f"{'='*80}")
+            # Print first 1000 chars to console (full content saved to file)
+            preview = content[:1000] + "..." if len(content) > 1000 else content
+            print(preview)
+            print(f"{'='*80}\n")
+
+            # Save full analysis to file
+            try:
+                from pathlib import Path
+                import time
+
+                output_dir = Path("output") / f"vision_{int(time.time())}"
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                vision_file = output_dir / "vision_analysis.txt"
+                vision_file.write_text(content, encoding='utf-8')
+
+                print(f"[{self.name.upper()}]  ✅ Saved full analysis to: {vision_file}")
+            except Exception as e:
+                print(f"[{self.name.upper()}]  ⚠️  Failed to save vision analysis: {e}")
+
         return output
 
     def _load_image(self, image_path: str) -> str:

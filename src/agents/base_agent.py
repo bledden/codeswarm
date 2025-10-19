@@ -20,6 +20,7 @@ class AgentOutput:
     model_used: str
     galileo_score: Optional[float] = None  # Set by evaluator
     iterations: int = 1  # How many improvement iterations
+    parsed_files: Optional[Dict[str, str]] = None  # For Implementation agent: filename -> content mapping
 
 
 class BaseAgent(ABC):
@@ -129,6 +130,23 @@ class BaseAgent(ABC):
             # Parse response
             content = response["choices"][0]["message"]["content"]
             code, reasoning = self._parse_response(content)
+
+            # CRITICAL VALIDATION: Check for empty outputs
+            if not code or not code.strip():
+                print(f"[{self.name.upper()}]  ❌ ERROR: Empty code output detected!")
+                print(f"[{self.name.upper()}]  Response length: {len(content)} chars")
+                print(f"[{self.name.upper()}]  Response preview: {content[:500]}...")
+
+                # If this is the last iteration, raise error
+                if iteration >= max_iterations:
+                    raise ValueError(f"{self.name} agent produced empty code after {max_iterations} iterations")
+
+                # Otherwise, continue to next iteration
+                print(f"[{self.name.upper()}]  Retrying in next iteration...")
+                continue
+
+            if not reasoning or not reasoning.strip():
+                print(f"[{self.name.upper()}]  ⚠️  WARNING: Empty reasoning (code is present, continuing)")
 
             # Create output
             output = AgentOutput(
