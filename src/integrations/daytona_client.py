@@ -10,6 +10,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import Daytona SDK if available
+try:
+    from daytona_sdk import Daytona
+    DAYTONA_SDK_AVAILABLE = True
+except ImportError:
+    DAYTONA_SDK_AVAILABLE = False
+    logger.warning("[DAYTONA] SDK not available, using REST API only")
+
 
 class DaytonaClient:
     """
@@ -55,6 +63,12 @@ class DaytonaClient:
         # Add organization ID header if available
         if self.org_id:
             self.headers["X-Daytona-Organization-ID"] = self.org_id
+
+        # Set environment variables for SDK
+        os.environ["DAYTONA_API_KEY"] = self.api_key
+        os.environ["DAYTONA_API_URL"] = self.api_url.replace('/api', '')  # SDK expects base URL
+        if self.org_id:
+            os.environ["DAYTONA_ORG_ID"] = self.org_id
 
         self.session: Optional[aiohttp.ClientSession] = None
 
@@ -159,50 +173,83 @@ class DaytonaClient:
             raise ValueError("No workspace ID provided")
 
         try:
-            # Upload files one by one using individual upload endpoint
-            logger.info(f"[DAYTONA]  Uploading {len(files)} files to workspace {workspace_id}")
+            # Use SDK if available, otherwise fall back to REST API
+            if DAYTONA_SDK_AVAILABLE:
+                logger.info(f"[DAYTONA]  Uploading {len(files)} files using SDK...")
 
-            for filepath, content in (files or {}).items():
-                # Prepare form data for file upload
-                import aiohttp
-                form = aiohttp.FormData()
-                form.add_field('file',
-                              content,
-                              filename=filepath.split('/')[-1],
-                              content_type='text/plain')
-                form.add_field('path', filepath)
+                # SDK reads from environment variables (DAYTONA_API_KEY, DAYTONA_API_URL)
+                # which we already set in __init__
+                daytona_sdk = Daytona()
 
-                # Upload single file
-                async with self.session.post(
-                    f"{self.api_url}/toolbox/{workspace_id}/toolbox/files/upload",
-                    headers={k: v for k, v in self.headers.items() if k != 'Content-Type'},  # Remove Content-Type, aiohttp sets it
-                    data=form
-                ) as response:
-                    if response.status not in [200, 201]:
-                        error = await response.text()
-                        logger.warning(f"[DAYTONA]  File upload failed for {filepath}: {error}")
-                    else:
+                # Get existing sandbox (workspace)
+                sandbox = daytona_sdk.get(workspace_id)
+
+                # Upload each file
+                for filepath, content in (files or {}).items():
+                    try:
+                        # Convert string content to bytes
+                        content_bytes = content.encode('utf-8') if isinstance(content, str) else content
+                        sandbox.fs.upload_file(content_bytes, filepath)
                         logger.debug(f"[DAYTONA]  Uploaded {filepath}")
+                    except Exception as e:
+                        logger.warning(f"[DAYTONA]  File upload failed for {filepath}: {e}")
 
-            logger.info(f"[DAYTONA]  Files uploaded successfully")
+                logger.info(f"[DAYTONA]  Files uploaded successfully using SDK")
+            else:
+                # Fallback to REST API (multipart form-data)
+                logger.info(f"[DAYTONA]  Uploading {len(files)} files using REST API...")
+
+                for filepath, content in (files or {}).items():
+                    # Prepare form data for file upload
+                    import aiohttp
+                    form = aiohttp.FormData()
+                    form.add_field('file',
+                                  content,
+                                  filename=filepath.split('/')[-1],
+                                  content_type='text/plain')
+                    form.add_field('path', filepath)
+
+                    # Upload single file
+                    async with self.session.post(
+                        f"{self.api_url}/toolbox/{workspace_id}/toolbox/files/upload",
+                        headers={k: v for k, v in self.headers.items() if k != 'Content-Type'},
+                        data=form
+                    ) as response:
+                        if response.status not in [200, 201]:
+                            error = await response.text()
+                            logger.warning(f"[DAYTONA]  File upload failed for {filepath}: {error}")
+                        else:
+                            logger.debug(f"[DAYTONA]  Uploaded {filepath}")
+
+                logger.info(f"[DAYTONA]  Files uploaded successfully using REST API")
 
             # Execute run command if provided
             output = None
             if run_command:
                 logger.info(f"[DAYTONA]  Executing command: {run_command}")
 
-                async with self.session.post(
-                    f"{self.api_url}/toolbox/{workspace_id}/toolbox/process/execute",
-                    headers=self.headers,
-                    json={"command": run_command}
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        output = data.get("output", "")
-                        logger.info(f"[DAYTONA]  Command executed successfully")
-                    else:
-                        error = await response.text()
-                        logger.warning(f"[DAYTONA]  Command execution failed: {error}")
+                if DAYTONA_SDK_AVAILABLE:
+                    try:
+                        # Use SDK for command execution
+                        result = sandbox.process.code_exec(run_command)
+                        output = result.stdout if hasattr(result, 'stdout') else str(result)
+                        logger.info(f"[DAYTONA]  Command executed successfully using SDK")
+                    except Exception as e:
+                        logger.warning(f"[DAYTONA]  SDK command execution failed: {e}")
+                else:
+                    # Use REST API
+                    async with self.session.post(
+                        f"{self.api_url}/toolbox/{workspace_id}/toolbox/process/execute",
+                        headers=self.headers,
+                        json={"command": run_command}
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            output = data.get("output", "")
+                            logger.info(f"[DAYTONA]  Command executed successfully")
+                        else:
+                            error = await response.text()
+                            logger.warning(f"[DAYTONA]  Command execution failed: {error}")
 
             # Get preview URL
             preview_url = await self.get_preview_url(workspace_id, port=3000)
