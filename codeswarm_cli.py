@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 """
 CodeSwarm CLI - Interactive Command-Line Interface
 
@@ -392,8 +392,20 @@ class CodeSwarmCLI:
         import re
         import subprocess
 
-        # Check if implementation.js exists (web project indicator)
-        # Try both old format (root) and new format (in implementation/ subdirectory)
+        # Check if we have a web project - two possible formats:
+        # 1. Already extracted files in implementation/ subdirectory (current format)
+        # 2. Consolidated implementation.js file (old format)
+
+        impl_dir = code_dir / "implementation"
+        package_json_file = impl_dir / "package.json"
+
+        # Case 1: Files already extracted - check for package.json
+        if package_json_file.exists():
+            # Files are already extracted! Just need to set up and prompt
+            self._setup_and_prompt_extracted_project(impl_dir, code_dir, timestamp)
+            return
+
+        # Case 2: Check for consolidated implementation.js file (existing logic)
         impl_file = code_dir / "implementation.js"
         if not impl_file.exists():
             impl_file = code_dir / "implementation" / "implementation.js"
@@ -502,6 +514,89 @@ npm run dev
         print("✅ PROJECT READY TO LAUNCH!".center(80))
         print(f"{'='*80}\n")
         print(f"📁 Project location: {project_dir}\n")
+
+        response = input("🚀 Would you like to launch the development server now? (y/n): ").strip().lower()
+
+        if response == 'y':
+            print(f"\n🌐 Launching development server at http://localhost:3000")
+            print("   Press Ctrl+C to stop\n")
+            try:
+                subprocess.run(["npm", "run", "dev"], cwd=project_dir)
+            except KeyboardInterrupt:
+                print("\n\n👋 Server stopped")
+            except Exception as e:
+                print(f"\n❌ Failed to start server: {e}")
+        else:
+            print("\n📝 To launch later, run:")
+            print(f"   cd {project_dir}")
+            print(f"   ./launch.sh")
+            print(f"\n   OR:")
+            print(f"   npm run dev\n")
+
+    def _setup_and_prompt_extracted_project(self, impl_dir: Path, code_dir: Path, timestamp: str):
+        """Set up and prompt user to launch an already-extracted web project"""
+        import subprocess
+
+        print(f"\n{'='*80}")
+        print("🚀 WEB PROJECT DETECTED!".center(80))
+        print(f"{'='*80}\n")
+
+        # The project is already in the implementation/ directory
+        # We'll use it directly instead of copying
+        project_dir = impl_dir
+
+        print(f"📁 Project location: {project_dir}\n")
+
+        # Install dependencies
+        package_json = project_dir / "package.json"
+        if package_json.exists():
+            print("📦 Installing dependencies...")
+            try:
+                result = subprocess.run(
+                    ["npm", "install"],
+                    cwd=project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                if result.returncode == 0:
+                    print("✅ Dependencies installed!\n")
+                else:
+                    print(f"⚠️  npm install had warnings (project may still work)\n")
+            except subprocess.TimeoutExpired:
+                print("⚠️  npm install timed out (you can run it manually)\n")
+            except FileNotFoundError:
+                print("⚠️  npm not found. Install Node.js from https://nodejs.org/\n")
+
+        # Create launch script
+        project_name = f"project_{timestamp}"
+        launch_script = project_dir / "launch.sh"
+        script_content = f"""#!/bin/bash
+# Launch script for {project_name}
+
+echo "🚀 Starting development server..."
+echo "📍 Project will be available at: http://localhost:3000"
+echo ""
+echo "Press Ctrl+C to stop the server"
+echo ""
+
+cd "$(dirname "$0")"
+
+if [ ! -d "node_modules" ]; then
+    echo "📦 Installing dependencies..."
+    npm install
+fi
+
+npm run dev
+"""
+        with open(launch_script, 'w') as f:
+            f.write(script_content)
+        os.chmod(launch_script, 0o755)
+
+        # Prompt user to launch
+        print(f"{'='*80}")
+        print("✅ PROJECT READY TO LAUNCH!".center(80))
+        print(f"{'='*80}\n")
 
         response = input("🚀 Would you like to launch the development server now? (y/n): ").strip().lower()
 
