@@ -113,3 +113,4 @@ cache/cli_*.json
 output/*.json
 output/code_*/
 !output/.gitkeep
+output/*/node_modules/
