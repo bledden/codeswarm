@@ -30,7 +30,7 @@ class VisionAgent(BaseAgent):
     def __init__(self, openrouter_client, evaluator=None):
         super().__init__(
             name="vision",
-            model="gpt-5",  # GPT-5 supports vision natively (text, image, file inputs)
+            model="gpt-5",  # GPT-5 with vision support (text, image, file inputs)
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.6,  # Balanced for creative interpretation
@@ -167,18 +167,31 @@ Provide a comprehensive technical specification that architecture and implementa
         latency_ms = int((time.time() - start_time) * 1000)
 
         # Parse response
-        content = response["choices"][0]["message"]["content"]
+        # DEBUG: Check response structure
+        if "choices" not in response or not response["choices"]:
+            print(f"[{self.name.upper()}]  ⚠️  No choices in response!")
+            print(f"[{self.name.upper()}]  Response: {response}")
+            content = ""
+        else:
+            message = response["choices"][0].get("message", {})
+            content = message.get("content", "")
+
+            # DEBUG: Show what we got
+            if not content:
+                print(f"[{self.name.upper()}]  ⚠️  Empty content in response!")
+                print(f"[{self.name.upper()}]  Message: {message}")
+                print(f"[{self.name.upper()}]  Full response: {response}")
 
         # For vision, the entire response is the analysis (no separate code block)
         from .base_agent import AgentOutput
         output = AgentOutput(
             agent_name=self.name,
-            code=content,  # Vision analysis as "code"
+            code=content if content else "ERROR: Vision analysis failed - empty response",
             reasoning="Vision analysis of uploaded image",
-            confidence=0.85,
+            confidence=0.85 if content else 0.0,
             latency_ms=latency_ms,
             model_used=self.model,
-            galileo_score=85.0,  # Vision doesn't need Galileo scoring
+            galileo_score=85.0 if content else 0.0,
             iterations=1
         )
 

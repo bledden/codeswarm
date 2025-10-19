@@ -67,10 +67,11 @@ class DaytonaClient:
             await self.session.close()
 
     async def create_session_if_needed(self):
-        """Create session if not exists"""
-        if not self.session:
+        """Create session if not exists or if closed"""
+        if not self.session or self.session.closed:
             timeout = ClientTimeout(total=300, connect=10, sock_read=300)
             self.session = aiohttp.ClientSession(timeout=timeout)
+            logger.debug(f"[DAYTONA]  Created new session")
 
     async def close(self):
         """Close the session"""
