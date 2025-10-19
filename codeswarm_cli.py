@@ -384,6 +384,143 @@ class CodeSwarmCLI:
         for item in files_saved:
             print(f"   ✅ {item}")
 
+        # Auto-extract and prompt for launch if it's a web project
+        self._extract_and_prompt_launch(code_dir, timestamp)
+
+    def _extract_and_prompt_launch(self, code_dir: Path, timestamp: str):
+        """Extract project files and prompt user to launch"""
+        import re
+        import subprocess
+
+        # Check if implementation.js exists (web project indicator)
+        # Try both old format (root) and new format (in implementation/ subdirectory)
+        impl_file = code_dir / "implementation.js"
+        if not impl_file.exists():
+            impl_file = code_dir / "implementation" / "implementation.js"
+            if not impl_file.exists():
+                return
+
+        # Check if it's a Node.js/web project
+        with open(impl_file, 'r') as f:
+            content = f.read()
+            if 'package.json' not in content:
+                return  # Not a web project
+
+        print(f"\n{'='*80}")
+        print("🚀 WEB PROJECT DETECTED!".center(80))
+        print(f"{'='*80}\n")
+
+        # Extract files automatically
+        project_name = f"project_{timestamp}"
+        project_dir = code_dir.parent / project_name
+
+        print(f"📦 Extracting project files to: {project_dir}/\n")
+
+        # Create project directory
+        project_dir.mkdir(exist_ok=True)
+
+        # Parse and extract files
+        file_pattern = r'^// file: (.+?)$'
+        files = re.findall(file_pattern, content, re.MULTILINE)
+        sections = re.split(r'^// file: .+?$', content, flags=re.MULTILINE)
+        sections = sections[1:]  # Skip header
+
+        extracted_count = 0
+        for filename, file_content in zip(files, sections):
+            # Clean up content
+            file_content = file_content.strip()
+
+            # Remove markdown code fences if present
+            if file_content.startswith('```') or file_content.startswith('tsx'):
+                lines = file_content.split('\n')
+                if lines[0].strip() in ['tsx', 'typescript', 'javascript', 'json', '```tsx', '```javascript', '```json', '```']:
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == '```':
+                    lines = lines[:-1]
+                file_content = '\n'.join(lines)
+
+            # Create full path
+            full_path = project_dir / filename
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write file
+            with open(full_path, 'w') as f:
+                f.write(file_content)
+
+            print(f"  ✅ {filename}")
+            extracted_count += 1
+
+        print(f"\n✨ Extracted {extracted_count} files!\n")
+
+        # Install dependencies
+        package_json = project_dir / "package.json"
+        if package_json.exists():
+            print("📦 Installing dependencies...")
+            try:
+                result = subprocess.run(
+                    ["npm", "install"],
+                    cwd=project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                if result.returncode == 0:
+                    print("✅ Dependencies installed!\n")
+                else:
+                    print(f"⚠️  npm install had warnings (project may still work)\n")
+            except subprocess.TimeoutExpired:
+                print("⚠️  npm install timed out (you can run it manually)\n")
+            except FileNotFoundError:
+                print("⚠️  npm not found. Install Node.js from https://nodejs.org/\n")
+
+        # Create launch script
+        launch_script = project_dir / "launch.sh"
+        script_content = f"""#!/bin/bash
+# Launch script for {project_name}
+
+echo "🚀 Starting development server..."
+echo "📍 Project will be available at: http://localhost:3000"
+echo ""
+echo "Press Ctrl+C to stop the server"
+echo ""
+
+cd "$(dirname "$0")"
+
+if [ ! -d "node_modules" ]; then
+    echo "📦 Installing dependencies..."
+    npm install
+fi
+
+npm run dev
+"""
+        with open(launch_script, 'w') as f:
+            f.write(script_content)
+        os.chmod(launch_script, 0o755)
+
+        # Prompt user to launch
+        print(f"{'='*80}")
+        print("✅ PROJECT READY TO LAUNCH!".center(80))
+        print(f"{'='*80}\n")
+        print(f"📁 Project location: {project_dir}\n")
+
+        response = input("🚀 Would you like to launch the development server now? (y/n): ").strip().lower()
+
+        if response == 'y':
+            print(f"\n🌐 Launching development server at http://localhost:3000")
+            print("   Press Ctrl+C to stop\n")
+            try:
+                subprocess.run(["npm", "run", "dev"], cwd=project_dir)
+            except KeyboardInterrupt:
+                print("\n\n👋 Server stopped")
+            except Exception as e:
+                print(f"\n❌ Failed to start server: {e}")
+        else:
+            print("\n📝 To launch later, run:")
+            print(f"   cd {project_dir}")
+            print(f"   ./launch.sh")
+            print(f"\n   OR:")
+            print(f"   npm run dev\n")
+
     def status(self):
         """Show current configuration and service status"""
         self.print_banner()
