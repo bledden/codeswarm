@@ -11,6 +11,7 @@ NO MOCKS - Uses real Galileo Observe SDK
 """
 
 import os
+import asyncio
 from typing import Dict, Any, Optional
 
 
@@ -22,12 +23,12 @@ class GalileoEvaluator:
     Uses REAL Galileo Observe API - NO MOCK DATA
     """
 
-    def __init__(self, api_key: Optional[str] = None, project: str = "codeswarm"):
+    def __init__(self, api_key: Optional[str] = None, project: Optional[str] = None):
         """Initialize Galileo evaluator
 
         Args:
             api_key: Galileo API key (or from environment)
-            project: Galileo project name
+            project: Galileo project name (or from environment GALILEO_PROJECT)
 
         Raises:
             ValueError: If no API key is provided
@@ -40,12 +41,12 @@ class GalileoEvaluator:
             pass  # dotenv not required
 
         self.api_key = api_key or os.getenv("GALILEO_API_KEY")
-        self.project = project
+        self.project = project or os.getenv("GALILEO_PROJECT", "codeswarm")
         self.console_url = os.getenv("GALILEO_CONSOLE_URL", "https://app.galileo.ai")
 
         if not self.api_key or self.api_key == "your_galileo_key_here":
             raise ValueError(
-                " NO GALILEO API KEY FOUND!\n"
+                "❌ NO GALILEO API KEY FOUND!\n"
                 "Please set GALILEO_API_KEY in .env file.\n"
                 "See COMPLETE_SETUP_GUIDE.md for instructions."
             )
@@ -56,12 +57,14 @@ class GalileoEvaluator:
 
         # Import and initialize Galileo Observe
         try:
-            from galileo_observe import ObserveWorkflows
+            from galileo_observe import ObserveWorkflows, Message, MessageRole
             self.observe_logger = ObserveWorkflows(project_name=self.project)
-            print(f"[GALILEO]  Initialized with REAL SDK (project: {project}, console: {self.console_url})")
+            self.Message = Message
+            self.MessageRole = MessageRole
+            print(f"[GALILEO] ✅ Initialized with REAL SDK (project: {self.project}, console: {self.console_url})")
         except ImportError:
             raise ImportError(
-                " galileo-observe package not installed!\n"
+                "❌ galileo-observe package not installed!\n"
                 "Run: pip install galileo-observe"
             )
 
@@ -97,10 +100,10 @@ class GalileoEvaluator:
                 name=f"CodeSwarm-{agent}"
             )
 
-            # Log the LLM call that generated this code
+            # Log the LLM call that generated this code (using proper Message format)
             wf.add_llm(
-                input=[{"role": "user", "content": task}],
-                output={"code": output},
+                input=self.Message(content=task, role=self.MessageRole.user),
+                output=self.Message(content=output, role=self.MessageRole.assistant),
                 model=model,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
@@ -115,17 +118,23 @@ class GalileoEvaluator:
             # Conclude workflow
             wf.conclude(output={"code": output})
 
-            # Upload to Galileo
-            self.observe_logger.upload_workflows()
+            # Upload to Galileo (synchronous call in async context - use executor)
+            print(f"[GALILEO] 📤 Uploading workflow to project '{self.project}'...")
+            await asyncio.get_event_loop().run_in_executor(
+                None, self.observe_logger.upload_workflows
+            )
 
             # Calculate quality score based on Galileo's metrics
             score = await self._calculate_quality_score(output, agent)
 
-            print(f"[GALILEO]  Evaluated {agent}: {score:.1f}/100")
+            print(f"[GALILEO] ✅ Evaluated {agent}: {score:.1f}/100 (uploaded to {self.project})")
+            print(f"[GALILEO] 🌐 View at: {self.console_url}")
             return score
 
         except Exception as e:
-            print(f"[GALILEO]  Evaluation failed: {e}")
+            print(f"[GALILEO] ❌ Evaluation failed: {e}")
+            import traceback
+            traceback.print_exc()
             raise RuntimeError(
                 f"Galileo evaluation failed: {e}\n"
                 "Make sure GALILEO_API_KEY is correct and Galileo Observe is accessible."

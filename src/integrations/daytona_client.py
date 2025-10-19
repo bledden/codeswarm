@@ -142,7 +142,7 @@ class DaytonaClient:
         run_command: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Deploy generated code to workspace
+        Deploy generated code to workspace using file upload
 
         Args:
             workspace_id: Workspace ID (uses default if not provided)
@@ -158,31 +158,63 @@ class DaytonaClient:
         if not workspace_id:
             raise ValueError("No workspace ID provided")
 
-        payload = {
-            "files": files or {},
-            "run_command": run_command
-        }
-
         try:
-            async with self.session.post(
-                f"{self.api_url}/workspace/{workspace_id}/deploy",
-                headers=self.headers,
-                json=payload
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    deployment = {
-                        "status": data.get("status"),
-                        "output": data.get("output"),
-                        "url": data.get("url")
-                    }
+            # Upload files one by one using individual upload endpoint
+            logger.info(f"[DAYTONA]  Uploading {len(files)} files to workspace {workspace_id}")
 
-                    logger.info(f"[DAYTONA]  Deployed code to workspace {workspace_id}")
-                    return deployment
-                else:
-                    error = await response.text()
-                    logger.error(f"[DAYTONA]  Deployment failed: {error}")
-                    raise Exception(f"Deployment failed: {error}")
+            for filepath, content in (files or {}).items():
+                # Prepare form data for file upload
+                import aiohttp
+                form = aiohttp.FormData()
+                form.add_field('file',
+                              content,
+                              filename=filepath.split('/')[-1],
+                              content_type='text/plain')
+                form.add_field('path', filepath)
+
+                # Upload single file
+                async with self.session.post(
+                    f"{self.api_url}/toolbox/{workspace_id}/toolbox/files/upload",
+                    headers={k: v for k, v in self.headers.items() if k != 'Content-Type'},  # Remove Content-Type, aiohttp sets it
+                    data=form
+                ) as response:
+                    if response.status not in [200, 201]:
+                        error = await response.text()
+                        logger.warning(f"[DAYTONA]  File upload failed for {filepath}: {error}")
+                    else:
+                        logger.debug(f"[DAYTONA]  Uploaded {filepath}")
+
+            logger.info(f"[DAYTONA]  Files uploaded successfully")
+
+            # Execute run command if provided
+            output = None
+            if run_command:
+                logger.info(f"[DAYTONA]  Executing command: {run_command}")
+
+                async with self.session.post(
+                    f"{self.api_url}/toolbox/{workspace_id}/toolbox/process/execute",
+                    headers=self.headers,
+                    json={"command": run_command}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        output = data.get("output", "")
+                        logger.info(f"[DAYTONA]  Command executed successfully")
+                    else:
+                        error = await response.text()
+                        logger.warning(f"[DAYTONA]  Command execution failed: {error}")
+
+            # Get preview URL
+            preview_url = await self.get_preview_url(workspace_id, port=3000)
+
+            deployment = {
+                "status": "deployed",
+                "output": output,
+                "url": preview_url
+            }
+
+            logger.info(f"[DAYTONA]  Deployed code to workspace {workspace_id}")
+            return deployment
 
         except Exception as e:
             logger.error(f"[DAYTONA]  Error deploying code: {e}")
