@@ -453,21 +453,73 @@ class FullCodeSwarmWorkflow:
             # Create workspace for this task
             workspace_name = f"codeswarm-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
 
-            # In real implementation, would:
-            # 1. Parse code into files
-            # 2. Create workspace
-            # 3. Deploy files
-            # 4. Run tests
+            # Parse code into files
+            files = self._parse_code_to_files(code)
 
-            # For now, just demonstrate the capability
+            if not files:
+                print(f"      ⚠️  No files parsed from code")
+                return None
+
+            # Create workspace
+            workspace = await self.daytona.create_workspace(
+                name=workspace_name,
+                repository_url=None,  # Deploying generated code, not cloning
+                branch="main"
+            )
+
+            if not workspace:
+                print(f"      ⚠️  Failed to create workspace")
+                return None
+
+            # Deploy code files to workspace
+            deployment = await self.daytona.deploy_code(
+                workspace_id=workspace.get('id'),
+                files=files,
+                run_command="npm install && npm run dev"  # Auto-start for web projects
+            )
+
             return {
                 "workspace_name": workspace_name,
-                "status": "deployed",
-                "url": f"https://app.daytona.io/workspaces/{workspace_name}"
+                "workspace_id": workspace.get('id'),
+                "status": deployment.get('status', 'deployed'),
+                "url": deployment.get('url') or workspace.get('url')
             }
         except Exception as e:
             print(f"      ⚠️  Daytona deployment error: {e}")
             return None
+
+    def _parse_code_to_files(self, code: str) -> Dict[str, str]:
+        """Parse generated code into individual files"""
+        import re
+
+        files = {}
+
+        # Pattern to match file markers like "// file: filename.ext" or "# filename.ext"
+        file_pattern = r'^(?://|#)\s*(?:file:\s*)?(.+?\.\w+)\s*$'
+
+        lines = code.split('\n')
+        current_file = None
+        current_content = []
+
+        for line in lines:
+            # Check if this line is a file marker
+            match = re.match(file_pattern, line.strip())
+            if match:
+                # Save previous file
+                if current_file and current_content:
+                    files[current_file] = '\n'.join(current_content).strip()
+
+                # Start new file
+                current_file = match.group(1).strip()
+                current_content = []
+            elif current_file:
+                current_content.append(line)
+
+        # Save last file
+        if current_file and current_content:
+            files[current_file] = '\n'.join(current_content).strip()
+
+        return files
 
     def _extract_keywords(self, text: str) -> List[str]:
         """Extract keywords from text"""
