@@ -7,6 +7,7 @@ import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from .model_selector import ModelSelector, TaskType
 
 
 @dataclass
@@ -77,27 +78,38 @@ class BaseAgent(ABC):
         task: str,
         context: Dict[str, Any],
         quality_threshold: float = 90.0,
-        max_iterations: int = 3
+        max_iterations: int = 3,
+        enable_model_fallback: bool = True
     ) -> AgentOutput:
         """
-        Execute the agent with quality improvement loop
+        Execute the agent with quality improvement loop and model fallback
 
         Args:
             task: User's task description
             context: Shared context (RAG patterns, previous agent outputs, etc.)
             quality_threshold: Minimum Galileo score to accept (default 90.0)
-            max_iterations: Max improvement iterations (default 3)
+            max_iterations: Max improvement iterations per model (default 3)
+            enable_model_fallback: Allow switching models if threshold not met (default True)
 
         Returns:
             AgentOutput with code, reasoning, and quality metrics
         """
         print(f"\n[{self.name.upper()}]  Starting execution...")
 
+        # Detect task type for intelligent model selection
+        task_type = ModelSelector.detect_task_type(task, context)
+        print(f"[{self.name.upper()}]  📊 Task type detected: {task_type.value}")
+        print(f"[{self.name.upper()}]  🤖 Using model: {self.model}")
+
         iteration = 0
         best_output = None
         best_score = 0.0
+        first_iteration_score = 0.0
+        original_model = self.model
+        model_attempt_number = 1  # Track which model we're on
+        max_model_attempts = 3  # Try up to 3 different models
 
-        while iteration < max_iterations:
+        while iteration < max_iterations and model_attempt_number <= max_model_attempts:
             iteration += 1
             print(f"[{self.name.upper()}]  Iteration {iteration}/{max_iterations}")
 
@@ -179,6 +191,10 @@ class BaseAgent(ABC):
                     output.galileo_score = score
                     print(f"[{self.name.upper()}]  Galileo score: {score:.1f}/100")
 
+                    # Track first iteration score for improvement calculation
+                    if iteration == 1:
+                        first_iteration_score = score
+
                     # Update best if better
                     if score > best_score:
                         best_score = score
@@ -197,8 +213,56 @@ class BaseAgent(ABC):
                 output.galileo_score = 85.0
                 return output
 
-        # Max iterations reached - return best attempt
+        # Max iterations reached for current model
         print(f"[{self.name.upper()}] ⏸  Max iterations reached. Best score: {best_score:.1f}/100")
+
+        # Check if we should try fallback model
+        if enable_model_fallback and best_score < quality_threshold:
+            score_improvement = best_score - first_iteration_score
+
+            # Determine if fallback should happen
+            should_fallback = ModelSelector.should_fallback(
+                iterations_completed=iteration,
+                max_iterations=max_iterations,
+                best_score=best_score,
+                quality_threshold=quality_threshold,
+                score_improvement=score_improvement
+            )
+
+            if should_fallback:
+                # Get next model to try
+                next_model = ModelSelector.get_next_model(
+                    current_model=self.model,
+                    task_type=task_type,
+                    attempts_with_current=iteration
+                )
+
+                if next_model and next_model != self.model:
+                    # Print fallback rationale
+                    rationale = ModelSelector.get_fallback_rationale(
+                        current_model=self.model,
+                        next_model=next_model,
+                        task_type=task_type,
+                        best_score=best_score,
+                        quality_threshold=quality_threshold
+                    )
+                    print(rationale)
+
+                    # Switch to fallback model
+                    self.model = next_model
+                    model_attempt_number += 1
+
+                    # Reset iteration counter for new model
+                    iteration = 0
+                    first_iteration_score = 0.0
+
+                    print(f"[{self.name.upper()}]  🔄 Starting attempt #{model_attempt_number} with {next_model}...")
+                    print(f"[{self.name.upper()}]  Resetting iteration counter (0/{max_iterations})")
+
+                    # Continue loop with new model (don't return yet!)
+                    continue
+
+        # No more fallbacks or threshold met - return best attempt
         return best_output if best_output else output
 
     def _parse_response(self, content: str) -> tuple[str, str]:
