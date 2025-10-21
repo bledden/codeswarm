@@ -183,8 +183,10 @@ $ python3.11 codeswarm.py --task "Create a secure REST API for managing tasks"
       ✅ Score: 94.0/100
       ✅ Output: 2,340 chars
 
-[6/8] 💻 Implementation & Security (Parallel)...
+[6/8] 💻 Implementation Agent (GPT-5 Pro)...
       ✅ Implementation: 96.0/100 (18,450 chars)
+
+[6b/8] 🔒 Security Agent (Claude Opus 4.1) - Reviewing Implementation...
       ✅ Security: 98.0/100 (12,890 chars)
 
 [7/8] 🧪 Testing Agent (Grok-4)...
@@ -277,27 +279,46 @@ Thank you for your feedback!
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  MULTI-AGENT CODE GENERATION                                            │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
-│  │   Architecture   │  │  Implementation  │  │      Security       │  │
-│  │ Claude Sonnet 4.5│  │   GPT-5 Pro      │  │  Claude Opus 4.1    │  │
-│  │                  │  │                  │  │                     │  │
-│  │ • System design  │  │ • Production code│  │ • Security review   │  │
-│  │ • Tech stack     │  │ • Best practices │  │ • Vulnerability fix │  │
-│  │ • API structure  │  │ • Error handling │  │ • Auth patterns     │  │
-│  └──────────────────┘  └──────────────────┘  └─────────────────────┘  │
-│           │                     │  (Parallel Execution)  │             │
-│           └─────────────────────┴────────────────────────┘             │
-│                                  │                                      │
-│                                  ▼                                      │
-│                         ┌──────────────────┐                           │
-│                         │     Testing      │                           │
-│                         │     Grok-4       │                           │
-│                         │                  │                           │
-│                         │ • Test suites    │                           │
-│                         │ • Edge cases     │                           │
-│                         │ • Coverage goals │                           │
-│                         └──────────────────┘                           │
+│  MULTI-AGENT CODE GENERATION (Sequential with Quality Gates)           │
+│                                                                          │
+│  ┌──────────────────┐                                                   │
+│  │   Architecture   │  Step 5: System Design                            │
+│  │ Claude Sonnet 4.5│                                                   │
+│  │                  │                                                   │
+│  │ • System design  │                                                   │
+│  │ • Tech stack     │                                                   │
+│  │ • API structure  │                                                   │
+│  └────────┬─────────┘                                                   │
+│           │                                                              │
+│           ▼                                                              │
+│  ┌──────────────────┐                                                   │
+│  │ Implementation   │  Step 6: Code Generation                          │
+│  │   GPT-5 Pro      │                                                   │
+│  │                  │                                                   │
+│  │ • Production code│                                                   │
+│  │ • Best practices │                                                   │
+│  │ • Error handling │                                                   │
+│  └────────┬─────────┘                                                   │
+│           │                                                              │
+│           ▼                                                              │
+│  ┌─────────────────────┐                                                │
+│  │      Security       │  Step 6b: Review Implementation                │
+│  │  Claude Opus 4.1    │                                                │
+│  │                     │  (Sequential - Reviews Generated Code)         │
+│  │ • Review ACTUAL code│                                                │
+│  │ • Vulnerability scan│                                                │
+│  │ • Auth patterns     │                                                │
+│  └────────┬────────────┘                                                │
+│           │                                                              │
+│           ▼                                                              │
+│  ┌──────────────────┐                                                   │
+│  │     Testing      │  Step 7: Test Generation                          │
+│  │     Grok-4       │                                                   │
+│  │                  │                                                   │
+│  │ • Test suites    │                                                   │
+│  │ • Edge cases     │                                                   │
+│  │ • Coverage goals │                                                   │
+│  └──────────────────┘                                                   │
 └────────────────────────────┬────────────────────────────────────────────┘
                              │
                              ▼
@@ -352,13 +373,15 @@ Thank you for your feedback!
 
 ### Agent Models
 
-| Agent | Model | Specialty | Quality Target |
-|-------|-------|-----------|----------------|
-| Architecture | Claude Sonnet 4.5 | System design, API structure | 90+ |
-| Implementation | GPT-5 Pro | Production code, best practices | 90+ |
-| Security | Claude Opus 4.1 | Security review, vulnerability fixes | 90+ |
-| Testing | Grok-4 | Test generation, edge cases | 90+ |
-| Vision | GPT-5 Image | UI/UX analysis from images | N/A |
+| Agent | Model | Specialty | Quality Target | Execution |
+|-------|-------|-----------|----------------|-----------|
+| Architecture | Claude Sonnet 4.5 | System design, API structure | 90+ | Step 5 |
+| Implementation | GPT-5 Pro | Production code, best practices | 90+ | Step 6 (after Architecture) |
+| Security | Claude Opus 4.1 | Reviews generated code, vulnerability scan | 90+ | Step 6b (after Implementation) |
+| Testing | Grok-4 | Test generation, edge cases | 90+ | Step 7 (after Security) |
+| Vision | GPT-5 Image | UI/UX analysis from images | N/A | Step 4 (if image provided) |
+
+**Note**: Security agent runs **sequentially after** Implementation to review the actual generated code, ensuring real security analysis rather than hypothetical review.
 
 ### Neo4j Knowledge Graph Schema
 
