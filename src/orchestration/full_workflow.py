@@ -232,9 +232,9 @@ class FullCodeSwarmWorkflow:
         print(f"      ✅ Score: {architecture_output.galileo_score}/100")
         print(f"      ✅ Output: {len(architecture_output.code)} chars\n")
 
-        # Step 6: Parallel Implementation + Security
-        print("[6/8] 💻 Implementation & Security (Parallel)...")
-        impl_task = self.implementation_agent.execute(
+        # Step 6: Implementation (First - Generate Code)
+        print("[6/8] 💻 Implementation Agent (GPT-5 Pro)...")
+        implementation_output = await self.implementation_agent.execute(
             task=task,
             context={
                 "architecture_output": architecture_output.code,
@@ -244,27 +244,31 @@ class FullCodeSwarmWorkflow:
             quality_threshold=self.quality_threshold,
             max_iterations=self.max_iterations
         )
-        sec_task = self.security_agent.execute(
+
+        # Check for None output (model fallback failed)
+        if implementation_output is None:
+            print(f"      ❌ Implementation: Failed (all models exhausted)")
+            raise Exception("Implementation agent failed - no models succeeded")
+
+        print(f"      ✅ Implementation: {implementation_output.galileo_score}/100 ({len(implementation_output.code)} chars)\n")
+
+        # Step 6b: Security Review (Sequential - Reviews the ACTUAL generated code)
+        print("[6b/8] 🔒 Security Agent (Claude Opus 4.1) - Reviewing Implementation...")
+        security_output = await self.security_agent.execute(
             task=task,
             context={
                 "architecture_output": architecture_output.code,
+                "implementation_output": implementation_output.code,  # ← CRITICAL: Review actual code!
                 "rag_patterns": rag_patterns
             },
             quality_threshold=self.quality_threshold,
             max_iterations=self.max_iterations
         )
 
-        implementation_output, security_output = await asyncio.gather(impl_task, sec_task)
-
-        # Check for None outputs (model fallback failed)
-        if implementation_output is None:
-            print(f"      ❌ Implementation: Failed (all models exhausted)")
-            raise Exception("Implementation agent failed - no models succeeded")
         if security_output is None:
             print(f"      ❌ Security: Failed (all models exhausted)")
             raise Exception("Security agent failed - no models succeeded")
 
-        print(f"      ✅ Implementation: {implementation_output.galileo_score}/100 ({len(implementation_output.code)} chars)")
         print(f"      ✅ Security: {security_output.galileo_score}/100 ({len(security_output.code)} chars)\n")
 
         # Step 7: Testing Stage
