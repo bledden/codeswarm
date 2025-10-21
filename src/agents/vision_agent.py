@@ -68,44 +68,69 @@ CRITICAL:
     def build_user_prompt(self, task: str, context: Dict[str, Any]) -> str:
         prompt = f"""Task: {task}
 
-Analyze the provided image (sketch/mockup/screenshot) and provide a detailed technical specification.
+Analyze the provided image (sketch/mockup/screenshot) and provide a PIXEL-PERFECT technical specification that will be used to build the exact design shown.
 
-Your analysis should include:
+⚠️  CRITICAL: Be extremely specific with measurements, colors, spacing, and layout. The implementation agent will follow your specs EXACTLY.
 
-1. **Layout Structure**:
-   - Overall page layout (header, main, sidebar, footer, etc.)
-   - Grid system or flexbox structure
-   - Spacing and alignment
+Your analysis MUST include:
 
-2. **UI Components**:
-   - List all visible components (buttons, inputs, cards, etc.)
-   - Component hierarchy and nesting
-   - Component states (default, hover, active, disabled)
+1. **Exact Measurements & Layout**:
+   - Overall canvas/viewport size (if discernible)
+   - Precise spacing values (margins, padding) in pixels or relative units
+   - Exact element positioning (centered, top-left at X,Y, etc.)
+   - Grid columns and gaps if applicable
+   - Header height, footer height, content area dimensions
+   - Container max-width and centering
 
-3. **Visual Design**:
-   - Color palette (primary, secondary, background, text colors)
-   - Typography (fonts, sizes, weights)
-   - Icons and images
-   - Borders, shadows, and effects
+2. **All Visual Elements** (Do NOT add elements not in the image):
+   - List ONLY components visible in the image
+   - Exact text content (word-for-word)
+   - Component sizes (width x height where measurable)
+   - Element hierarchy and nesting structure
+   - Z-index layering if elements overlap
 
-4. **Interactions**:
-   - What happens when users click/tap elements?
-   - Form submissions and validations
-   - Navigation flows
-   - Animations or transitions
+3. **Exact Colors** (use hex codes if possible):
+   - Background colors (main page, sections, components)
+   - Text colors (headers, body, links, labels)
+   - Border colors
+   - Shadow colors and opacity
+   - Button/interactive element colors (default, hover if shown)
 
-5. **Technical Recommendations**:
-   - Suggested frontend framework (React, Vue, etc.)
-   - Key libraries or components to use
-   - Responsive design breakpoints
-   - Accessibility considerations
+4. **Typography Details**:
+   - Font families (or closest web-safe alternatives)
+   - Exact font sizes in px/rem for each text element
+   - Font weights (regular, medium, bold, etc.)
+   - Line heights and letter spacing
+   - Text alignment (left, center, right)
 
-6. **Implementation Priority**:
-   - What should be built first?
-   - What are the critical user flows?
-   - Any complex interactions to prioritize?
+5. **Spacing System**:
+   - Identify consistent spacing scale (8px, 16px, 24px, etc.)
+   - Margins between sections
+   - Padding inside components
+   - Gap between related elements
 
-Provide a comprehensive technical specification that architecture and implementation agents can use."""
+6. **Borders, Shadows & Effects**:
+   - Border thickness, style (solid/dashed), radius
+   - Box shadows (offset-x, offset-y, blur, spread, color)
+   - Any gradients, patterns, or textures
+   - Opacity/transparency values
+
+7. **Simple Implementation Approach**:
+   - Recommend the SIMPLEST tech stack that can achieve this design
+   - For simple sketches: prefer vanilla HTML/CSS/JS over frameworks
+   - For complex apps: suggest React/Next.js/etc.
+   - Identify if any animations/interactions are shown
+   - Note responsive breakpoints if multiple device views shown
+
+8. **Validation Checklist** (for implementation agent):
+   - ✓ All elements from sketch are present
+   - ✓ No extra elements added
+   - ✓ Colors match exactly
+   - ✓ Spacing matches the visual proportions
+   - ✓ Layout structure matches (grid, flexbox, positioning)
+   - ✓ Text content is word-for-word accurate
+
+Provide a comprehensive technical specification with EXACT values wherever possible. Avoid vague terms like "medium padding" - use "24px padding" instead.
 
         return prompt
 

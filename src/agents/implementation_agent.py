@@ -173,17 +173,32 @@ console.log('Hello');
 
         # PRIORITY: Vision analysis comes FIRST for image-to-code tasks
         if vision_analysis:
-            prompt += f"""🎨 VISUAL DESIGN SPECIFICATION (PRIMARY - MUST IMPLEMENT EXACTLY):
+            prompt += f"""🎨 PIXEL-PERFECT DESIGN SPECIFICATION (YOUR PRIMARY SOURCE OF TRUTH):
 {vision_analysis}
 
-⚠️  CRITICAL: Your implementation MUST match this visual design pixel-for-pixel.
-Pay special attention to:
-- Exact colors, fonts, sizes specified
-- Layout structure (grid, flexbox, spacing)
-- All UI components mentioned
-- Visual hierarchy and positioning
-- Responsive breakpoints
-- Border styles, shadows, effects
+⚠️  CRITICAL IMPLEMENTATION RULES:
+1. Match the design EXACTLY - this is your PRIMARY requirement
+2. Use EXACT values from the spec (colors, spacing, sizes)
+3. Include ONLY elements shown in the design - DO NOT add extras
+4. Follow the specified tech stack (simple HTML/CSS/JS if recommended)
+5. Do NOT over-engineer - keep it simple if the design is simple
+6. Text must be word-for-word from the specification
+7. Layout must match the visual proportions precisely
+
+🚫 COMMON MISTAKES TO AVOID:
+- Adding extra features not in the design (fancy animations, complex state management)
+- Using Next.js/React for simple static designs
+- Adding components not shown in the sketch (extra buttons, navbars, footers)
+- Deviating from specified colors/fonts/spacing
+- Over-complicating simple designs
+
+✅ BEFORE SUBMITTING, VERIFY:
+- All elements from spec are present (no missing components)
+- No extra elements added (only what's in the sketch)
+- Colors match exactly (use hex codes from spec)
+- Spacing/sizing matches visual proportions
+- Text content is word-for-word accurate
+- Tech stack matches recommendation (don't use React if vanilla JS was recommended)
 
 """
 
