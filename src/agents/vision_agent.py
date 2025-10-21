@@ -34,7 +34,7 @@ class VisionAgent(BaseAgent):
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.6,  # Balanced for creative interpretation
-            max_tokens=8000  # Increased for comprehensive image analysis with exact text extraction
+            max_tokens=16000  # High limit - let vision complete full analysis (varies by image complexity)
         )
 
     def get_system_prompt(self) -> str:
