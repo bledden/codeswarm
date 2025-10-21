@@ -57,6 +57,8 @@ CodeSwarm demonstrates how multiple AI agents can collaborate with a **knowledge
 - **GitHub CLI** (`gh`) - Optional, for GitHub integration: https://cli.github.com/
 - API keys (see Setup below)
 
+> 💡 **Recommended**: Use a virtual environment for Python dependencies. See [Python Setup Guide](docs/PYTHON_SETUP.md) for instructions.
+
 ### Installation
 
 ```bash
@@ -64,13 +66,20 @@ CodeSwarm demonstrates how multiple AI agents can collaborate with a **knowledge
 git clone https://github.com/bledden/codeswarm.git
 cd codeswarm
 
+# Set up virtual environment (recommended)
+python3.11 -m venv venv
+source venv/bin/activate  # macOS/Linux
+# or: venv\Scripts\activate  # Windows
+
 # Install dependencies
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 
 # Copy environment template and add your API keys
 cp .env.example .env
 nano .env
 ```
+
+> 📖 For detailed Python environment setup (venv, pyenv, auto-activation), see [docs/PYTHON_SETUP.md](docs/PYTHON_SETUP.md)
 
 ### Get API Keys
 
