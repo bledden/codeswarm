@@ -1,0 +1,446 @@
+# CodeSwarm Quick Demo
+
+Task: Create a REST API for a todo list with CRUD operations
+
+## Architecture
+
+
+                     API Gateway/Router                   
+                   (Express.js Router)                    
+
+                         
+         
+                                       
+                                       
+    
+   Auth            Todo          User      
+ Controller     Controller     Controller  
+    
+                                       
+       
+                        
+              
+                                 
+                                 
+           
+         Service         Validation  
+          Layer           Middleware 
+           
+              
+       
+                    
+                    
+  
+  Data            Cache     
+  Access          Layer     
+  Layer          (Redis)    
+  
+       
+       
+
+  Database   
+ (PostgreSQL)
+
+
+## Implementation
+
+// package.json
+{
+  "name": "todo-api",
+  "version": "1.0.0",
+  "description": "Production-ready Todo REST API with Express, PostgreSQL, and Redis",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.0.0",
+    "helmet": "^7.0.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.11.3",
+    "redis": "^4.6.11",
+    "uuid": "^9.0.1"
+  }
+}
+
+/*
+.env (example)
+PORT=3000
+DATABASE_URL=postgres://user:password@localhost:5432/tododb
+REDIS_URL=redis://localhost:6379
+JWT_ACCESS_SECRET=your_access_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+ACCESS_TOKEN_TTL=15m
+REFRESH_TOKEN_TTL=7d
+NODE_ENV=development
+*/
+
+// server.js (entry point)
+require('dotenv').config();
+const { initDb } = require('./src/config/db');
+const { redisClient } = require('./src/config/redis');
+const { createApp } = require('./src/app');
+const { logger } = require('./src/utils/logger');
+const { initCache } = require('./src/cache/cacheClient');
+
+async function start() {
+  try {
+    await initDb(); // ensure tables exist
+    await initCache(); // ensure redis connects
+    const app = createApp();
+    const port = process.env.PORT || 3000;
+    const server = app.listen(port, () => {
+      logger.info(`Server listening on port ${port}`);
+    });
+
+    // Graceful shutdown
+    const shutdown = async () => {
+      try {
+        logger.info('Shutting down...');
+        server.close(() => {
+          logger.info('HTTP server closed');
+        });
+        await redisClient.quit();
+        process.exit(0);
+      } catch (err) {
+        logger.error({ err }, 'Error during shutdown');
+        process.exit(1);
+      }
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } catch (err) {
+    logger.error({ err }, 'Failed to start server');
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = { start };
+
+// src/app.js
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const morgan = require('morgan');
+const { apiRouter } = require('./router');
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+
+function createApp() {
+  const app = express();
+
+  app.use(helmet());
+  app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] }));
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: false }));
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() });
+  });
+
+  app.use('/api/v1', apiRouter);
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+}
+
+module.exports = { createApp };
+
+// src/router/index.js (API Gateway/Router)
+const express = require('express');
+const { authRouter } = require('./routes/authRoutes');
+const { todoRouter } = require('./routes/todoRoutes');
+const { userRouter } = require('./routes/userRoutes');
+
+const apiRouter = express.Router();
+apiRouter.use('/auth', authRouter);
+apiRouter.use('/todos', todoRouter);
+apiRouter.use('/users', userRouter);
+
+module.exports = { apiRouter };
+
+// src/router/routes/authRoutes.js
+const express = require('express');
+const { authController } = require('../../controllers/authController');
+const { validate } = require('../../middleware/validation');
+const { authSchemas } = require('../../validation/schemas');
+const { rateLimiter } = require('../../middleware/rateLimiter');
+
+const authRouter = express.Router();
+
+authRouter.post('/register', rateLimiter.authLimiter, validate(authSchemas.register), authController.register);
+authRouter.post('/login', rateLimiter.authLimiter, validate(authSchemas.login), authController.login);
+authRouter.post('/refresh', rateLimiter.authLimiter, validate(authSchemas.refresh), authController.refresh);
+authRouter.post('/logout', rateLimiter.authLimiter, validate(authSchemas.refresh), authController.logout);
+
+module.exports = { authRouter };
+
+// src/router/routes/todoRoutes.js
+const express = require('express');
+const { todoController } = require('../../controllers/todoController');
+const { requireAuth } = require('../../middleware/auth');
+const { validate } = require('../../middleware/validation');
+const { todoSchemas } = require('../../validation/schemas');
+
+const todoRouter = express.Router();
+
+todoRouter.use(requireAuth);
+
+todoRouter.post('/', validate(todoSchemas.create), todoController.create);
+todoRouter.get('/', validate(todoSchemas.list), todoController.list);
+todoRouter.get('/:id', validate(todoSchemas.todoIdParam), todoController.getById);
+todoRouter.patch('/:id', validate(todoSchemas.update), todoController.update);
+todoRouter.delete('/:id', validate(todoSchemas.todoIdParam), todoController.remove);
+todoRouter.patch('/:id/toggle', validate(todoSchemas.todoIdParam), todoController.toggle);
+
+module.exports = { todoRouter };
+
+// src/router/routes/userRoutes.js
+const express = require('express');
+const { userController } = require('../../controllers/userController');
+const { requireAuth } = require('../../middleware/auth');
+const { validate } = require('../../middleware/validation');
+const { userSchemas } = require('../../validation/schemas');
+
+const userRouter = express.Router();
+
+userRouter.use(requireAuth);
+userRouter.get('/me', userController.me);
+userRouter.patch('/me', validate(userSchemas.updateMe), userController.updateMe);
+
+module.exports = { userRouter };
+
+// src/controllers/authController.js (Auth Controller)
+const { asyncHandler } = require('../middleware/asyncHandler');
+const { authService } = require('../services/authService');
+
+const authController = {
+  register: asyncHandler(async (req, res) => {
+    const { email, password, name } = req.body;
+    const { user, tokens } = await authService.register({ email, password, name });
+    res.status(201).json({ user, tokens });
+  }),
+
+  login: asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const { user, tokens } = await authService.login({ email, password });
+    res.json({ user, tokens });
+  }),
+
+  refresh: asyncHandler(async (req, res) => {
+    const { refreshToken } = req.body;
+    const tokens = await authService.refresh(refreshToken);
+    res.json({ tokens });
+  }),
+
+  logout: asyncHandler(async (req, res) => {
+    const { refreshToken } = req.body;
+    await authService.logout(refreshToken);
+    res.status(204).send();
+  }),
+};
+
+module.exports = { authController };
+
+// src/controllers/todoController.js (Todo Controller)
+const { asyncHandler } = require('../middleware/asyncHandler');
+const { todoService } = require('../services/todoService');
+
+const todoController = {
+  create: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const todo = await todoService.create(userId, req.body);
+    res.status(201).json({ todo });
+  }),
+
+  list: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const { limit, offset, completed } = req.query;
+    const result = await todoService.list(userId, {
+      limit: Number(limit) || 20,
+      offset: Number(offset) || 0,
+      completed: completed === undefined ? undefined : completed === 'true',
+    });
+    res.json(result);
+  }),
+
+  getById: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const todoId = req.params.id;
+    const todo = await todoService.getById(userId, todoId);
+    res.json({ todo });
+  }),
+
+  update: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const todoId = req.params.id;
+    const updated = await todoService.update(userId, todoId, req.body);
+    res.json({ todo: updated });
+  }),
+
+  remove: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const todoId = req.params.id;
+    await todoService.remove(userId, todoId);
+    res.status(204).send();
+  }),
+
+  toggle: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const todoId = req.params.id;
+    const updated = await todoService.toggle(userId, todoId);
+    res.json({ todo: updated });
+  }),
+};
+
+module.exports = { todoController };
+
+// src/controllers/userController.js (User Controller)
+const { asyncHandler } = require('../middleware/asyncHandler');
+const { userService } = require('../services/userService');
+
+const userController = {
+  me: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const user = await userService.getById(userId);
+    res.json({ user });
+  }),
+
+  updateMe: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const updated = await userService.update(userId, req.body);
+    res.json({ user: updated });
+  }),
+};
+
+module.exports = { userController };
+
+// src/services/authService.js (Service Layer)
+const { userRepository } = require('../data/userRepository');
+const { sessionRepository } = require('../data/sessionRepository');
+const { hashPassword, verifyPassword } = require('../utils/password');
+const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const { HttpError } = require('../utils/httpErrors');
+const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
+
+const authService = {
+  async register({ email, password, name }) {
+    const existing = await userRepository.findByEmail(email);
+    if (existing) throw new HttpError(409, 'Email already registered');
+    const passwordHash = await hashPassword(password);
+    const user = await userRepository.create({
+      id: uuidv4(),
+      email,
+      passwordHash,
+      name,
+    });
+    const tokens = await this.createSessionAndTokens(user.id);
+    return { user: sanitizeUser(user), tokens };
+  },
+
+  async login({ email, password }) {
+    const user = await userRepository.findByEmail(email);
+    if (!user) throw new HttpError(401, 'Invalid email or password');
+    const ok = await verifyPassword(password, user.password_hash);
+    if (!ok) throw new HttpError(401, 'Invalid email or password');
+    const tokens = await this.createSessionAndTokens(user.id);
+    return { user: sanitizeUser(user), tokens };
+  },
+
+  async refresh(refreshToken) {
+    // Verify signature and extract payload (sid, sub)
+    const payload = await verifyRefreshToken(refreshToken);
+    const session = await sessionRepository.findById(payload.sid);
+    if (!session || session.revoked) throw new HttpError(401, 'Invalid refresh token');
+    if (new Date(session.expires_at) < new Date()) {
+      await sessionRepository.revoke(session.id);
+      throw new HttpError(401, 'Refresh token expired');
+    }
+    // Compare token hash
+    const match = await bcrypt.compare(refreshToken, session.refresh_token_hash);
+    if (!match) {
+      await sessionRepository.revoke(session.id);
+      throw new HttpError(401, 'Invalid refresh token');
+    }
+    // Rotate session: revoke old, create new
+    await sessionRepository.revoke(session.id);
+    const tokens = await this.createSessionAndTokens(session.user_id);
+    return tokens;
+  },
+
+  async logout(refreshToken) {
+    try {
+      const payload = await verifyRefreshToken(refreshToken);
+      const session = await sessionRepository.findById(payload.sid);
+      if (session && !session.revoked) {
+        await sessionRepository.revoke(session.id);
+      }
+    } catch (_) {
+      // Swallow errors to avoid leaking info; logout is idempotent
+    }
+  },
+
+  async createSessionAndTokens(userId) {
+    const accessToken = await signAccessToken({ sub: userId });
+    const sessionId = uuidv4();
+    const refreshToken = await signRefreshToken({ sub: userId, sid: sessionId });
+
+    const expiresAt = computeRefreshExpiryDate(process.env.REFRESH_TOKEN_TTL || '7d');
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+
+    await sessionRepository.create({
+      id: sessionId,
+      userId,
+      refreshTokenHash,
+      expiresAt,
+    });
+
+    return { accessToken, refreshToken };
+  },
+};
+
+function computeRefreshExpiryDate(ttl) {
+  // Supports "7d", "15m", "3600" seconds
+  const now = new Date();
+  const m = String(ttl).match(/^(\d+)([smhd])?$/);
+  let ms = 0;
+  if (!m) {
+    ms = 7 * 24 * 3600 * 1000;
+  } else {
+    const n = parseInt(m[1], 10);
+    const unit = m[2] || 's';
+    const factor = unit === 's' ? 1000 : unit === 'm' ? 60000 : unit === 'h' ? 3600000 : 86400000;
+    ms = n * factor;
+  }
+  return new Date(now.getTime() + ms);
+}
+
+function sanitizeUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    createdAt: user.created_at,
+  };
+}
+
+module.exports = { authService };
+
+// src/services/todoService.js (Service Layer)
+const {
+

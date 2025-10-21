@@ -1,0 +1,165 @@
+[Detailed technical specification of the visual design]
+
+1) Layout structure
+- Overall page regions
+  - Header (banner): centered brand name “BLAKE Inc.”
+  - Hero (main > section.hero): email capture form centered under the brand; large circular smiley illustration centered below the form.
+  - Footer (contentinfo): three evenly spaced items/columns: “Disclaimer”, “Email”, “Social Media”.
+  - Page frame: thick dark border around the entire canvas with slightly rounded outer corners.
+
+- Container and grid
+  - Page max-width: 1200px; horizontally centered with auto margins.
+  - Global padding: 24px on mobile, 32px tablet, 48px desktop inside the frame.
+  - Use a 12‑column responsive grid (CSS Grid or flexbox utilities) for alignment.
+    - Header: single centered column.
+    - Hero: form is an inline row (input + button) centered, then illustration centered.
+    - Footer: 3 columns at ≥768px; single column stack on mobile.
+
+- Spacing
+  - Header brand to form: 24–32px.
+  - Between email input and Sign Up button: 12–16px.
+  - Form to illustration: 32–48px.
+  - Footer top margin: 64px from hero on desktop; 40px mobile.
+  - Footer column internal spacing: 8–12px between icon/text if added later.
+
+- Background pattern (optional, per sketch)
+  - Faint rounded-rect grid backdrop (3 columns × 2 rows) using a subtle 1px stroke and 12–16px corner radius at 10–15% opacity. Strictly decorative; do not reduce legibility.
+
+2) UI components
+- Header
+  - Brand wordmark (text logo): “BLAKE Inc.”
+- Email capture form
+  - Input: type="email", placeholder “Email Entry”.
+  - Primary button: “Sign Up”.
+  - Validation message area (inline, below input).
+- Hero illustration
+  - Large circular smiley face (SVG).
+- Footer
+  - Footer link items: “Disclaimer”, “Email”, “Social Media”. Each is a link; can be arranged as text buttons.
+- Page frame
+  - Outer border surrounding the whole page.
+
+Component hierarchy and nesting
+- <header>
+  - <h1> BLAKE Inc.
+- <main>
+  - <section class="hero">
+    - <form id="signup-form">
+      - <label for="email" class="sr-only">Email</label>
+      - <input id="email" type="email">
+      - <button type="submit">Sign Up</button>
+      - <p role="status" id="signup-msg"></p>
+    - <figure class="hero-illustration"> [smiley SVG] </figure>
+- <footer>
+  - <nav aria-label="Footer">
+    - <ul>
+      - <li><a href="/disclaimer">Disclaimer</a></li>
+      - <li><a href="mailto:hello@blake.inc">Email</a></li>
+      - <li><a href="https://social-link">Social Media</a></li>
+
+Component states
+- Input
+  - Default: 1.5px–2px solid border.
+  - Hover: slightly darker border.
+  - Focus: 2px focus ring with visible contrast; no outline suppression.
+  - Invalid: border changes to error color; helper text shown.
+  - Disabled: reduced opacity; no pointer events.
+- Button
+  - Default: filled or outlined primary style (see Visual Design).
+  - Hover: 4–6% tint shift and elevation via subtle shadow.
+  - Active: pressed state with 1–2px downward transform or darker shade.
+  - Focus-visible: 2px focus ring outside the button.
+  - Disabled: 40% opacity, cursor not-allowed.
+- Footer links
+  - Hover: underline or color shift.
+  - Focus-visible: outline ring.
+
+3) Visual design
+- Color palette (monochrome-forward per sketch; add accent as needed)
+  - Background: #FFFFFF
+  - Text primary: #111827 (near-black)
+  - Frame/border: #0F172A (dark navy-black) or #111111
+  - Subtle grid lines (optional): rgba(17, 24, 39, 0.08)
+  - Primary accent (for button/focus): choose one
+    - Option A (monochrome): text/border #111827; hover #374151; focus ring #1D4ED8
+    - Option B (brand accent): #2563EB (blue) with hover #1D4ED8; focus ring #93C5FD
+  - Error: #DC2626
+  - Success: #16A34A
+
+- Typography
+  - Heading (logo): Bold, friendly sans with personality (e.g., Poppins, Inter Black, or a hand-drawn-style display like Fredoka One if brand allows).
+    - h1 size: 48px mobile, 64px tablet, 72px desktop; line-height 1.1.
+  - Body/controls: Inter, System UI, or Source Sans.
+    - Input text: 16px; line-height 1.4.
+    - Button text: 16px–18px, semibold 600.
+    - Footer links: 14–16px, medium 500.
+
+- Icons and images
+  - Smiley illustration as inline SVG: 360–480px diameter desktop, 240–300px mobile. Stroke 3–4px; color = text primary.
+
+- Borders, shadows, effects
+  - Page frame: 12–16px solid border around body or main container; border-radius 8–12px to match sketch corners.
+  - Inputs/buttons: 8px border-radius.
+  - Shadows: minimal; use sm 0 1px 2px rgba(0,0,0,0.06) on button hover/active if using filled style.
+
+4) Interactions
+- Email form
+  - On submit:
+    - Validate required + email format. Show inline error text below input.
+    - Disabled submit state while request pending; show spinner inside button or text “Signing up…”.
+    - On success: replace form with success message “Thanks! Check your inbox.” or show toast; optionally keep smiley.
+    - On failure: show error message (network/duplicate).
+  - Keyboard: Enter triggers submit.
+
+- Navigation flows
+  - Footer links:
+    - Disclaimer: navigates to /disclaimer.
+    - Email: mailto link or contact page /contact.
+    - Social Media: opens new tab target="_blank" rel="noopener".
+
+- Hover/focus animations
+  - 150–200ms ease transitions for color, background, box-shadow, and transform.
+  - Smiley SVG can have a subtle 2–3% scale on hover for delight (prefers-reduced-motion respected).
+
+5) Technical recommendations
+- Framework
+  - React + Next.js for simple marketing page and API route for subscriptions.
+  - Styling: Tailwind CSS or CSS Modules with design tokens.
+
+- Key libraries
+  - Form: React Hook Form + Zod for validation; or native HTML5 with progressive enhancement.
+  - Email subscription: POST to /api/subscribe integrating with Mailchimp, ConvertKit, or a serverless email list.
+  - Icons/illustrations: Inline custom SVG for smiley.
+  - Accessibility testing: @axe-core/react during development.
+
+- Responsive breakpoints
+  - xs: 0–479px (single-column; input and button stack vertically with 8px gap)
+  - sm: 480–767px (inline form if space allows, else stacked)
+  - md: 768–1023px (footer becomes 3 columns)
+  - lg: 1024–1279px
+  - xl: ≥1280px (cap content at 1200px)
+
+- Accessibility
+  - Semantic regions: header, main, footer, nav.
+  - Labels: visible placeholder plus an offscreen label for input; associate with for/id.
+  - Color contrast: maintain ≥4.5:1 for text; focus rings ≥3:1.
+  - Keyboard support: tab order logical; :focus-visible styles.
+  - Reduced motion: respect prefers-reduced-motion for any animations.
+  - Form error messaging: use role="alert" or aria-live="polite" for status updates.
+
+6) Implementation priority
+- Milestone 1 (MVP skeleton)
+  - Build semantic layout: header, hero with form, footer.
+  - Implement page frame and basic typography.
+  - Ensure responsive stack: mobile-first, then tablet/desktop.
+- Milestone 2 (Form and validation)
+  - Email input + submit with client and server validation.
+  - Success/error states; loading state; integration with mailing list provider.
+- Milestone 3 (Branding and polish)
+  - Smiley SVG, background grid pattern, button hover/focus, transitions.
+  - Footer links wired; external link attributes.
+- Milestone 4 (Accessibility and QA)
+  - Contrast checks, keyboard-only navigation, screen reader review.
+  - Analytics event on successful sign-up.
+
+Design

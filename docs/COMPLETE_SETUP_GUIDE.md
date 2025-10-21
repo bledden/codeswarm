@@ -193,7 +193,7 @@ Your `.env` file should now have:
 
 ```bash
 # OpenRouter (already working)
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key-here
 
 # Galileo
 GALILEO_API_KEY=gal_xxxxxxxxxxxxxxxxxxxxx
