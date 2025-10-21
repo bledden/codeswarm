@@ -121,22 +121,33 @@ class GitHubClient:
             )
 
             # Configure git user using GitHub CLI authenticated user
-            # Get user's GitHub username and email from gh CLI
+            # Get user's GitHub username from gh CLI
             gh_user = subprocess.run(
                 ["gh", "api", "user", "-q", ".login"],
                 capture_output=True,
                 text=True,
                 check=True
             )
-            gh_email = subprocess.run(
-                ["gh", "api", "user/emails", "-q", '.[0].email'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
 
             username = gh_user.stdout.strip() if gh_user.returncode == 0 else "CodeSwarm"
-            email = gh_email.stdout.strip() if gh_email.returncode == 0 else f"{username}@users.noreply.github.com"
+
+            # Try to get email - if it fails due to missing scope, use noreply address
+            try:
+                gh_email = subprocess.run(
+                    ["gh", "api", "user/emails", "-q", '.[0].email'],
+                    capture_output=True,
+                    text=True,
+                    check=False  # Don't raise on error
+                )
+                if gh_email.returncode == 0:
+                    email = gh_email.stdout.strip()
+                else:
+                    # Missing 'user' scope - use noreply email
+                    logger.warning(f"[GITHUB]  Cannot access user email (missing 'user' scope), using noreply address")
+                    email = f"{username}@users.noreply.github.com"
+            except Exception as e:
+                logger.warning(f"[GITHUB]  Error fetching email: {e}, using noreply address")
+                email = f"{username}@users.noreply.github.com"
 
             # Configure git with authenticated user's identity
             subprocess.run(
