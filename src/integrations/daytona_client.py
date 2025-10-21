@@ -484,14 +484,21 @@ class DaytonaClient:
     async def get_preview_url(
         self,
         workspace_id: Optional[str] = None,
-        port: int = 3000
+        port: int = 3000,
+        max_retries: int = 5,
+        initial_wait: int = 3
     ) -> Optional[str]:
         """
-        Get preview URL for a workspace port
+        Get preview URL for a workspace port with retry logic
+
+        The sandbox needs time to fully boot up and get an IP address assigned.
+        This method retries with exponential backoff to handle the startup delay.
 
         Args:
             workspace_id: Workspace ID (uses default if not provided)
             port: Port number (default 3000)
+            max_retries: Maximum number of retry attempts (default 5)
+            initial_wait: Initial wait time in seconds (default 3)
 
         Returns:
             Preview URL string or None
@@ -502,24 +509,43 @@ class DaytonaClient:
         if not workspace_id:
             raise ValueError("No workspace ID provided")
 
-        try:
-            async with self.session.get(
-                f"{self.api_url}/workspace/{workspace_id}/ports/{port}/preview-url",
-                headers=self.headers
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    url = data.get("url") or data.get("previewUrl")
-                    logger.info(f"[DAYTONA]  Got preview URL for port {port}")
-                    return url
+        import asyncio
+
+        for attempt in range(max_retries):
+            try:
+                async with self.session.get(
+                    f"{self.api_url}/workspace/{workspace_id}/ports/{port}/preview-url",
+                    headers=self.headers
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        url = data.get("url") or data.get("previewUrl")
+                        logger.info(f"[DAYTONA]  Got preview URL for port {port}")
+                        return url
+                    else:
+                        error_text = await response.text()
+
+                        # Check if this is the "no IP address" error indicating sandbox not ready
+                        if "no IP address found" in error_text and attempt < max_retries - 1:
+                            wait_time = initial_wait * (2 ** attempt)  # Exponential backoff
+                            logger.info(f"[DAYTONA]  Sandbox not ready yet (no IP), retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                            await asyncio.sleep(wait_time)
+                            continue
+                        else:
+                            logger.warning(f"[DAYTONA]  Could not get preview URL: {error_text}")
+                            return None
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = initial_wait * (2 ** attempt)
+                    logger.warning(f"[DAYTONA]  Error getting preview URL (attempt {attempt + 1}/{max_retries}): {e}, retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
                 else:
-                    error = await response.text()
-                    logger.warning(f"[DAYTONA]  Could not get preview URL: {error}")
+                    logger.error(f"[DAYTONA]  Error getting preview URL after {max_retries} attempts: {e}")
                     return None
 
-        except Exception as e:
-            logger.error(f"[DAYTONA]  Error getting preview URL: {e}")
-            return None
+        logger.error(f"[DAYTONA]  Failed to get preview URL after {max_retries} attempts")
+        return None
 
     async def delete_workspace(
         self,
