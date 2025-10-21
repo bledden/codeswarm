@@ -14,8 +14,8 @@ from pathlib import Path
 # Add src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations.neo4j_client import Neo4jRAGClient
-from integrations.tavily_client import TavilyClient
+from src.integrations.neo4j_client import Neo4jRAGClient
+from src.integrations.tavily_client import TavilyClient
 
 
 async def test_tavily_cache():

@@ -14,14 +14,14 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations import (
+from src.integrations import (
     OpenRouterClient,
     Neo4jRAGClient,
     BrowserUseClient,
     WorkOSAuthClient,
     DaytonaClient
 )
-from evaluation.galileo_evaluator import GalileoEvaluator
+from src.evaluation.galileo_evaluator import GalileoEvaluator
 
 
 def print_header(text: str):

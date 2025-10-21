@@ -9,9 +9,9 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations import OpenRouterClient, Neo4jRAGClient
-from evaluation import GalileoEvaluator
-from orchestration import FullCodeSwarmWorkflow
+from src.integrations import OpenRouterClient, Neo4jRAGClient
+from src.evaluation import GalileoEvaluator
+from src.orchestration import FullCodeSwarmWorkflow
 
 
 async def test_cli_workflow():

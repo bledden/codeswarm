@@ -409,12 +409,15 @@ codeswarm/
 │   │   └── full_workflow.py     # ✨ Enhanced with proven docs
 │   ├── evaluation/              # Quality assessment
 │   └── learning/                # Autonomous improvement
-├── tests/                       # Test suite
+├── tests/                       # Test suite (all test_*.py files)
+├── demos/                       # Demo scripts (demo_*.py files)
+├── results/                     # Test results and vision outputs
 ├── output/                      # Generated code output
 ├── docs/                        # Documentation
 │   ├── COMPLETE_SETUP_GUIDE.md
 │   ├── NEO4J_TAVILY_SCHEMA.md              # 📚 Knowledge graph design
-│   └── NEO4J_TAVILY_IMPLEMENTATION_PROGRESS.md  # 📊 Phase 1-5 status
+│   ├── NEO4J_TAVILY_IMPLEMENTATION_PROGRESS.md  # 📊 Phase 1-5 status
+│   └── FEATURE_HIGHLIGHTS.md               # 🎯 Presentation materials
 ├── .env.example                 # Environment template
 └── README.md                    # This file
 ```
@@ -431,13 +434,13 @@ codeswarm/
 
 ```bash
 # Quick service test
-python3.11 test_services_quick.py
+python3.11 tests/test_services_quick.py
 
 # Test Neo4j + Tavily caching (Phase 1)
-python3.11 test_tavily_cache.py
+python3.11 tests/test_tavily_cache.py
 
 # Full integration demo
-python3.11 demo_full_integration.py
+python3.11 demos/demo_full_integration.py
 ```
 
 ---

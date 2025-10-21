@@ -1,0 +1,99 @@
+[Detailed technical specification of the visual design]
+
+Name: BLAKE Inc. – Simple landing page with email capture
+
+1) Layout Structure
+- Overall page layout (semantic regions)
+  - header: centered site title only.
+  - main: hero stack with H1, email capture form, large central illustration.
+  - footer: three columns with “Disclaimer”, “Email”, “Social Media”.
+  - Decorative frame: thick border around the entire page.
+  - Background pattern: faint rounded-rectangle grid across the canvas.
+
+- Grid/flex structure
+  - Root container: centered, max-width 1024–1140px.
+    - Use CSS grid in footer; flex/stack for hero.
+  - Hero stack (vertical):
+    - H1
+    - Form row: email input + sign-up button (inline on desktop, stacked on mobile)
+    - Illustration area (centered circle).
+  - Footer grid:
+    - 3 equal columns on desktop
+    - 2 columns on tablets
+    - 1 column on phones
+
+- Spacing and alignment
+  - Page padding: 24px (<=640px), 40px (641–1024px), 64px (>=1025px)
+  - Vertical spacing in hero:
+    - H1 to form: 16–24px
+    - Form to illustration: 24–40px
+  - Footer padding-top: 48px; row gap 16–24px
+  - Decorative frame: 16–20px solid border inside viewport (see Accessibility for focus containment)
+
+2) UI Components
+- HeaderTitle
+  - Element: h1 with text “BLAKE Inc.”
+  - Alignment: centered
+
+- EmailCaptureForm
+  - Elements:
+    - TextField (type=email, placeholder “Email Entry”)
+    - Primary Button (“Sign Up”)
+  - Layout: inline flex, gap 12px (desktop); vertical stack with 8–12px gap (mobile)
+  - Validation: HTML5 email + custom regex; inline error text below input
+  - States:
+    - TextField: default, focus, valid, invalid, disabled
+    - Button: default, hover, active, focus-visible, disabled, loading
+
+- Illustration
+  - A circular smiley face centered under the form
+  - Recommended: inline SVG 220–300px diameter responsive; aria-hidden="true"
+
+- FooterColumns
+  - Column 1: Disclaimer (link to /disclaimer or modal)
+  - Column 2: Email (contact mailto: link or contact page)
+  - Column 3: Social Media (icon buttons for platforms)
+  - Elements:
+    - Section headings (visually styled as labels)
+    - Links (underline on hover)
+    - Social icons (SVGs)
+
+- DecorativeFrame
+  - Implement as a pseudo-element on body or a full-bleed wrapper with box-shadow inset or border
+  - Must not clip focus outlines; leave 8–12px inner padding before content
+
+- BackgroundPattern
+  - Faint rounded-rectangle tiles (approx 4 columns x 3 rows impression)
+  - Implement with an SVG repeating pattern or CSS paint:
+    - Tile size ~260–300px, corner radius 16–20px, stroke 1px with 5–8% opacity
+
+- Component hierarchy and nesting (DOM outline)
+  - body
+    - div.app
+      - header.site-header
+        - h1.title
+      - main
+        - section.hero
+          - form.email-capture
+            - label (visually hidden)
+            - input[type=email]
+            - button[type=submit]
+          - figure.smiley-illustration (SVG)
+      - footer.site-footer
+        - nav.footer-grid
+          - section.footer-item.disclaimer -> a
+          - section.footer-item.email -> a
+          - section.footer-item.social -> a buttons/icons
+
+3) Visual Design
+- Color palette (CSS variables)
+  - --color-bg: #FFFFFF
+  - --color-text: #111213
+  - --color-muted: #6B7280
+  - --color-accent: #2563EB (primary action)
+  - --color-accent-hover: #1E40AF
+  - --color-border: #0F172A (for frame)
+  - --color-pattern: rgba(17,17,19,0.06) or #EDEFF5
+  - --color-success: #16A34A
+  - --color-error: #DC2626
+  - Dark mode (optional): invert backgrounds and use #E

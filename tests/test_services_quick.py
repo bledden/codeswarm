@@ -17,7 +17,7 @@ print("=" * 60)
 # Test OpenRouter
 print("\n1. Testing OpenRouter...")
 try:
-    from integrations.openrouter_client import OpenRouterClient
+    from src.integrations.openrouter_client import OpenRouterClient
     async def test_openrouter():
         async with OpenRouterClient() as client:
             response = await client.complete(
@@ -35,7 +35,7 @@ except Exception as e:
 # Test Neo4j
 print("\n2. Testing Neo4j...")
 try:
-    from integrations.neo4j_client import Neo4jRAGClient
+    from src.integrations.neo4j_client import Neo4jRAGClient
     async def test_neo4j():
         async with Neo4jRAGClient() as client:
             await client.verify_connection()
@@ -50,7 +50,7 @@ except Exception as e:
 # Test Galileo
 print("\n3. Testing Galileo...")
 try:
-    from evaluation.galileo_evaluator import GalileoEvaluator
+    from src.evaluation.galileo_evaluator import GalileoEvaluator
     async def test_galileo():
         evaluator = GalileoEvaluator()
         score = await evaluator.evaluate(
@@ -69,7 +69,7 @@ except Exception as e:
 # Test WorkOS
 print("\n4. Testing WorkOS...")
 try:
-    from integrations.workos_client import WorkOSAuthClient
+    from src.integrations.workos_client import WorkOSAuthClient
     client = WorkOSAuthClient()
     url = client.get_authorization_url(
         redirect_uri="http://localhost:3000/callback",
@@ -82,7 +82,7 @@ except Exception as e:
 # Test Daytona
 print("\n5. Testing Daytona...")
 try:
-    from integrations.daytona_client import DaytonaClient
+    from src.integrations.daytona_client import DaytonaClient
     async def test_daytona():
         async with DaytonaClient() as client:
             workspaces = await client.list_workspaces()
@@ -96,7 +96,7 @@ except Exception as e:
 # Test Browser Use (expect fail on Python 3.9)
 print("\n6. Testing Browser Use...")
 try:
-    from integrations.browser_use_client import BrowserUseClient
+    from src.integrations.browser_use_client import BrowserUseClient
     print(f"   ✅ Browser Use: Installed")
 except ImportError as e:
     print(f"   ⚠️  Browser Use: Not available (requires Python 3.11+)")

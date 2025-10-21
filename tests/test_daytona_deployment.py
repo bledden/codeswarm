@@ -20,7 +20,7 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from integrations import DaytonaClient
+from src.integrations import DaytonaClient
 
 
 async def test_daytona_deployment():

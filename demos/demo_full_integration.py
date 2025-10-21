@@ -14,15 +14,15 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations import (
+from src.integrations import (
     BrowserUseClient,
     OpenRouterClient,
     Neo4jRAGClient,
     WorkOSAuthClient,
     DaytonaClient
 )
-from evaluation.galileo_evaluator import GalileoEvaluator
-from orchestration import FullCodeSwarmWorkflow
+from src.evaluation.galileo_evaluator import GalileoEvaluator
+from src.orchestration import FullCodeSwarmWorkflow
 
 
 def print_header(text: str, char: str = "="):

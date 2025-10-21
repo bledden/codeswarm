@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from integrations import OpenRouterClient
-from evaluation import GalileoEvaluator
-from agents import ImplementationAgent
+from src.integrations import OpenRouterClient
+from src.evaluation import GalileoEvaluator
+from src.agents import ImplementationAgent
 
 
 async def test_agent_with_galileo():

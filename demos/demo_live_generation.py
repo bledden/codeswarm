@@ -22,8 +22,8 @@ load_dotenv()
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from integrations import OpenRouterClient
-from agents import ImplementationAgent
+from src.integrations import OpenRouterClient
+from src.agents import ImplementationAgent
 
 
 class LiveGenerationDemo:

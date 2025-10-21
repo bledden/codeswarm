@@ -1,0 +1,122 @@
+```
+[Detailed technical specification of the visual design]
+
+1) Layout Structure
+- Page regions
+  - Header: centered brand name “BLAKE Inc.”
+  - Main/Hero: vertically centered block with a sign-up form (email input + “Sign Up” button) and a large circular smiley/illustration beneath.
+  - Footer: 3 evenly spaced items/links — “Disclaimer”, “Email”, “Social Media”.
+  - Decorative page frame: thick dark border around the entire canvas.
+
+- Container and alignment
+  - Page width: fluid with max-width: 1200px (xl). Center container with auto margins.
+  - Horizontal padding: 16px (mobile), 24px (tablet), 32px (desktop).
+  - Main min-height: calc(100vh - header - footer). Use flexbox to vertically stack header, main, footer with space-between so main stays centered.
+  - Decorative frame: 20–24px solid border (or pseudo-element) on all sides. Maintain inside padding so content doesn’t collide with the frame (at least 16px on mobile, 32px desktop).
+
+- Grid/Flex usage
+  - Header: single centered line (text-align: center).
+  - Hero: 
+    - Form row uses flex (gap 12–16px). On <640px stack input above button with gap 8–12px.
+    - Illustration sits below the form, centered.
+  - Footer: CSS grid with 3 columns (1fr 1fr 1fr). On <640px collapse to 1 column, stacked with 12–16px gaps.
+  - Spacing scale (design tokens): 4, 8, 12, 16, 24, 32, 48, 64.
+    - Header top margin: 32–48.
+    - Gap between header and form: 24–32.
+    - Gap between form and illustration: 24–32.
+    - Footer top margin from main: 48.
+
+2) UI Components
+- AppShell
+  - Children: PageFrame, HeaderBrand, HeroSection, FooterLinks.
+
+- PageFrame (decorative)
+  - Variants: default.
+  - Implementation: border: 24px solid var(--frame); or ::before full-bleed pseudo-element with box-shadow/linear-gradient to mimic marker feel if desired.
+
+- HeaderBrand
+  - Content: H1 “BLAKE Inc.”
+  - States: none.
+  - Alignment: centered.
+
+- HeroSection
+  - EmailSignupForm (inline)
+    - TextInput (type="email")
+      - Placeholder: “Email entry”
+      - Label (visually hidden): “Email address”
+      - States:
+        - Default: neutral border
+        - Focus: 2px focus ring with accent color; maintain 3:1 contrast with adjacent colors
+        - Error: red border/text + helper text below (“Enter a valid email address”)
+        - Disabled: reduced opacity (60–70%), non-interactive
+      - Size: height 44–48px, padding 12x16, border-radius 8px
+    - PrimaryButton “Sign Up”
+      - States:
+        - Default: filled accent background, white text
+        - Hover: darken accent by ~8–10%
+        - Active: darken by ~12–15%, press offset 1px
+        - Focus-visible: 2px outline offset 2px
+        - Disabled: 50% opacity, cursor: not-allowed
+        - Loading (optional): spinner left of label; button disabled
+      - Size: height 44–48px, min-width 120px, border-radius 8px
+    - Validation behavior:
+      - Client-side email pattern check; show inline error beneath input; aria-live="polite"
+      - Prevent submission when invalid
+    - Submission:
+      - POST to /api/subscribe or external service; on success replace hero with confirmation or show toast “Thanks! Please check your inbox.”
+  - HeroIllustration
+    - Circular smiley placeholder (SVG). Diameter ~240–320px desktop, 160–200px mobile. Centered, no interactivity.
+
+- FooterLinks
+  - 3 link items:
+    - Disclaimer (to /disclaimer)
+    - Email (mailto:contact@blake.inc)
+    - Social Media (icons + links; open target="_blank" rel="noopener")
+  - States: hover underline; focus-visible outline.
+  - Layout: grid 3 cols desktop; stacked mobile.
+
+- Global/Utility components
+  - Toast/Alert (optional) for submission feedback.
+  - LoadingOverlay (optional).
+
+- Component hierarchy
+  AppShell
+    └─ PageFrame
+       └─ <main role="main">
+          ├─ HeaderBrand (H1)
+          ├─ HeroSection
+          │  ├─ EmailSignupForm
+          │  │  ├─ Label (visually hidden)
+          │  │  ├─ TextInput[type=email]
+          │  │  └─ PrimaryButton
+          │  └─ HeroIllustration (SVG)
+          └─ FooterLinks (Grid of 3 link items)
+
+3) Visual Design
+- Color palette (tokens)
+  - --bg: #FFFFFF
+  - --text: #0B0B0F (near-black)
+  - --muted: #6B7280 (gray-500 for helper text)
+  - --frame: #111111 (for thick page border)
+  - --accent: #2563EB (blue-600; primary button, focus ring)
+  - --accent-hover: #1E4FD6
+  - --error: #DC2626 (red-600)
+  - --success: #16A34A (green-600)
+  - All text-to-background contrast >= 4.5:1 for body and >= 3:1 for large text.
+
+- Typography
+  - Font family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif
+  - H1 (brand): 48–64px, weight 700, line-height 1.1, centered
+  - Body: 16px, line-height 1.5
+  - Button: 16px, weight 600
+  - Footer links: 16px; can scale to 14px on small screens while maintaining contrast
+
+- Icons and images
+  - Hero smiley: monochrome SVG stroke 2–4px using --text
+  - Social media: SVG icons (GitHub, X/Twitter, LinkedIn, etc.) sized 20–24px
+  - Favicon: simple “B” or smiley
+
+- Borders, shadows, effects
+  - Input border: 1px solid #D1D5DB (gray-300), radius 8px
+  - Button: no border; subtle shadow for depth: 0 1px 2px rgba(0,0,0,0.08)
+  - Focus

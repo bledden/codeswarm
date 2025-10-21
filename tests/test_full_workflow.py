@@ -20,17 +20,17 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from integrations.openrouter_client import OpenRouterClient
-from agents import (
+from src.integrations.openrouter_client import OpenRouterClient
+from src.agents import (
     ArchitectureAgent,
     ImplementationAgent,
     SecurityAgent,
     TestingAgent,
     VisionAgent
 )
-from orchestration import CodeSwarmWorkflow
-from evaluation import GalileoEvaluator
-from learning.code_learner import CodeSwarmLearner
+from src.orchestration import CodeSwarmWorkflow
+from src.evaluation import GalileoEvaluator
+from src.learning.code_learner import CodeSwarmLearner
 
 
 async def test_full_workflow():

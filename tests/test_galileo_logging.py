@@ -16,7 +16,7 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from evaluation import GalileoEvaluator
+from src.evaluation import GalileoEvaluator
 
 
 async def test_galileo_logging():

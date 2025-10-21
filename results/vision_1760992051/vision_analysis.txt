@@ -1,0 +1,61 @@
+[Detailed technical specification of the visual design]
+Product: “BLAKE Inc.” single-page landing with email signup
+
+1) Layout Structure
+- Document regions
+  - Header: centered brand title “BLAKE Inc.”
+  - Main (Hero): email capture form (input + Sign Up button) centered beneath header; large hero illustration area (smiley placeholder)
+  - Footer: three items laid out horizontally on desktop: “Disclaimer”, “Email”, “Social Media”
+  - Decorative page frame: thick border surrounding the entire canvas (inside the browser viewport)
+- Grid/Flex
+  - Page container: max-width 1120px, centered with auto margins
+  - Vertical stacking: header, hero, footer in a single column
+  - Hero form: 2-column inline layout using flex (input grows, button intrinsic width)
+  - Footer: 3-column grid on ≥1024px; 1 column stacked on small screens
+- Spacing and alignment (desktop defaults)
+  - Outer page padding: 40px top/bottom, 24px left/right (increase to 40px on ≥1280px)
+  - Header top spacing: 48px from top padding
+  - Spacing between header and form: 24px
+  - Form to illustration spacing: 32px
+  - Footer top spacing: 64px from illustration
+  - Gutter between form input and button: 12–16px
+  - Footer column gap: 40px; align items baseline/center
+- Responsive behavior
+  - Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px
+  - At <768px: form stacks vertically (input full-width, button 100% below with 12px gap); footer stacks items vertically with 12px spacing; tighter paddings (24px all sides)
+  - At 768–1023px: footer becomes 2 columns (Disclaimer | Email + Social Media as a column)
+
+2) UI Components
+- AppFrame
+  - Renders the thick decorative border around the page content (see Visual Design)
+- Header.BrandTitle
+  - H1 text “BLAKE Inc.” centered
+- Hero.CTAForm (semantic form)
+  - Label: “Email address”
+  - EmailInput: type="email", name="email", placeholder="Email", autocomplete="email", required
+  - PrimaryButton: text “Sign Up”, type="submit"
+  - ValidationMessage region (inline text under input)
+  - Optional: Form container with subtle outline to echo the sketch’s boxed form
+- Hero.Illustration
+  - Large centered graphic area; default: smiley SVG placeholder 320–400px diameter that scales with viewport
+- Footer.Section
+  - Three link items:
+    - Disclaimer: link to /disclaimer
+    - Email: mailto link or “Contact” page link
+    - Social Media: horizontal list of icon links (e.g., X/Twitter, LinkedIn, Instagram)
+- Feedback/Toast (non-blocking)
+  - Success: “Thanks for signing up! Please check your email.”
+  - Error: “Please enter a valid email” or backend error message
+- Component hierarchy and nesting
+  - <AppFrame>
+    - <Header><BrandTitle/></Header>
+    - <Main>
+      - <CTAForm>
+        - <Label/><EmailInput/><PrimaryButton/><ValidationMessage/>
+      - <Illustration/>
+    - </Main>
+    - <Footer>
+      - <FooterNav>Disclaimer | Email | Social Media</FooterNav>
+    - </Footer>
+  - States
+    - EmailInput: default, focus, error

@@ -7,9 +7,9 @@ load_dotenv()
 import sys
 sys.path.insert(0, 'src')
 
-from integrations.openrouter_client import OpenRouterClient
-from agents import TestingAgent
-from evaluation import GalileoEvaluator
+from src.integrations.openrouter_client import OpenRouterClient
+from src.agents import TestingAgent
+from src.evaluation import GalileoEvaluator
 
 
 async def test_testing_agent():

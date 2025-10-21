@@ -1,0 +1,110 @@
+[Detailed technical specification of the visual design]
+
+1) Layout structure
+- Page regions
+  - Frame: a thick, full-viewport border surrounding the content.
+  - Header: centered brand title “BLAKE Inc.” at the top.
+  - Hero section: an email capture input and a Sign Up button aligned horizontally, centered. Large circular smiley illustration below.
+  - Footer: three evenly spaced links/items across the bottom: “Disclaimer”, “Email”, “Social Media”.
+
+- Container and grid
+  - Content container: max-width 1200px, centered (margin-inline: auto), padding-inline: 24px desktop, 16px mobile.
+  - Global spacing scale (8pt): 8, 12, 16, 24, 32, 48, 64.
+  - Header spacing: top padding 48; spacing to hero control 24.
+  - Hero layout: vertical stack, center aligned using flexbox; input group uses inline flex.
+  - Footer grid: 3 columns (1fr 1fr 1fr) with items left, center, right aligned; stacks to one column on mobile.
+
+- Frame/border
+  - Inset “frame” around the page: 24px solid black inside the viewport. Implement via body::before overlay or an inset box-shadow: box-shadow: inset 0 0 0 24px #111.
+
+2) UI components
+- BrandHeader
+  - Element: h1 with text “BLAKE Inc.”
+  - Alignment: text-align: center.
+
+- EmailCapture (InputGroup)
+  - Text input (type="email") with visible label “Email” (sr-only label OK if placeholder used) and placeholder “Email Entry”.
+  - Primary button labeled “Sign Up”.
+  - Group container uses display: inline-flex; gap: 8px; wrapped on small screens to stacked layout.
+
+- Illustration
+  - Decorative smiley face graphic below the input group; centered.
+  - Size: 280–320px diameter desktop; 200–240px mobile.
+  - Implement as inline SVG so it scales crisply.
+
+- FooterLinks
+  - Three link items: “Disclaimer”, “Email” (mailto link), “Social Media” (row of icons or a link to a hub).
+  - Desktop alignment: left/center/right in a 3-col grid. Mobile: stacked with 12–16px vertical spacing, centered text.
+
+- Optional utility components
+  - Toast/Alert for subscription success/error.
+  - Loading spinner in button when submitting.
+
+- Component states
+  - Input
+    - Default: 1px outline/border, radius 8px, placeholder text.
+    - Hover: border-color slightly darker.
+    - Focus: 2–3px focus ring (visible, high contrast).
+    - Invalid: border-color error, error text below (12–14px).
+    - Disabled: reduced opacity, not interactive.
+  - Button
+    - Default: outlined style to match input, medium radius (8px).
+    - Hover: filled or stronger outline; background subtle gray.
+    - Active: pressed background slightly darker; inset shadow removed.
+    - Focus: visible focus ring.
+    - Disabled: 60% opacity, cursor: not-allowed.
+    - Loading: spinner left of label; disable pointer events.
+  - Links
+    - Default: plain text.
+    - Hover/focus: underline.
+    - Active: underline and slightly darker.
+
+3) Visual design
+- Color palette (black/white minimal per sketch; add accessible focus color)
+  - Background: #FFFFFF
+  - Text primary: #111111
+  - Border/Frame: #111111 (or #000000)
+  - Input/outline: #1F1F1F at 1px; hover #000
+  - Focus ring: #2563EB (accessible blue) or #111 if remaining monochrome
+  - Error: #B00020
+  - Button hover fill: #F3F4F6 (light gray)
+- Typography
+  - Font family: system stack or Inter/Helvetica Neue (fallback to Arial, sans-serif).
+  - H1 (brand): 56–64px, weight 700.
+  - Body text/inputs: 16px, line-height 1.5, weight 400.
+  - Button label: 16px, weight 600.
+  - Footer links: 14–16px.
+- Icons/images
+  - Smiley face SVG (stroke 2–3px, no fill).
+  - Social icons (if used): SVG line icons (24px) with aria-labels.
+- Borders/shadows
+  - Inputs/buttons: 1px solid; radius 8px.
+  - No drop shadows needed; rely on outline and hover fills.
+  - Page frame: 24px solid black via inset effect.
+
+4) Interactions
+- Email subscription flow
+  - On Sign Up click or Enter key in the email field:
+    - Validate email format (HTML5 + client-side regex).
+    - If invalid: show inline error “Enter a valid email address.”
+    - If valid: POST to /api/subscribe { email }.
+    - Button enters loading state; disable input.
+    - On success: show toast “Thanks! Check your inbox.” and clear the field.
+    - On error: show toast “Something went wrong. Try again.” keep email value.
+- Navigation
+  - Disclaimer: navigates to /disclaimer.
+  - Email: mailto:hello@blake.inc (configurable).
+  - Social Media: links open in new tabs (rel="noopener noreferrer").
+- Keyboard and focus
+  - Tab order: input -> button -> footer links.
+  - Pressing Enter in input triggers submit.
+- Animations/transitions
+  - 150–200ms transitions on color/background/border for button and input states.
+  - Toast slide/fade 200ms; reduced-motion respects prefers-reduced-motion.
+
+5) Technical recommendations
+- Framework
+  - React + Next.js (for simple page and easy deployment) or a static HTML/CSS build if no dynamic backend required.
+- Styling
+  - Tailwind CSS (fast utility build) or CSS Modules/Vanilla Extract. Provide design tokens as CSS variables:
+   

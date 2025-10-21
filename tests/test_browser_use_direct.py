@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from integrations.browser_use_client import BrowserUseClient
+from src.integrations.browser_use_client import BrowserUseClient
 
 
 async def test_direct_scraping():

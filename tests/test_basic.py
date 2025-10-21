@@ -13,9 +13,9 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from integrations.openrouter_client import OpenRouterClient
-from agents import ArchitectureAgent
-from evaluation import GalileoEvaluator
+from src.integrations.openrouter_client import OpenRouterClient
+from src.agents import ArchitectureAgent
+from src.evaluation import GalileoEvaluator
 
 
 async def test_openrouter():
