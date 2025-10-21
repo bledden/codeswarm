@@ -176,6 +176,35 @@ console.log('Hello');
             prompt += f"""🎨 PIXEL-PERFECT DESIGN SPECIFICATION (YOUR PRIMARY SOURCE OF TRUTH):
 {vision_analysis}
 
+⚠️  TASK-BASED IMPLEMENTATION APPROACH:
+Break down the implementation into discrete, verifiable tasks. Implement each element systematically:
+
+STEP 1: Setup & Structure
+- Create file structure matching tech stack recommendation
+- Set up HTML boilerplate with exact viewport/meta tags
+- Establish base CSS reset and global styles
+
+STEP 2: Layout Implementation
+- Implement exact container widths and centering
+- Create grid/flexbox structure as specified
+- Add all spacing (margins, padding) with EXACT pixel values
+- Verify responsive breakpoints if specified
+
+STEP 3: Component-by-Component Implementation
+For EACH component in the vision spec (in order):
+  a) Create HTML structure for the component
+  b) Apply exact colors (backgrounds, borders, text)
+  c) Add exact typography (font-family, size, weight, line-height)
+  d) Apply exact spacing (margin, padding)
+  e) Add borders/shadows/effects with exact values
+  f) Verify text content is word-for-word accurate
+
+STEP 4: Visual Polish
+- Double-check all hex color values match spec
+- Verify all spacing matches proportions
+- Ensure z-index layering if elements overlap
+- Test responsive behavior at breakpoints
+
 ⚠️  CRITICAL IMPLEMENTATION RULES:
 1. Match the design EXACTLY - this is your PRIMARY requirement
 2. Use EXACT values from the spec (colors, spacing, sizes)
@@ -184,6 +213,7 @@ console.log('Hello');
 5. Do NOT over-engineer - keep it simple if the design is simple
 6. Text must be word-for-word from the specification
 7. Layout must match the visual proportions precisely
+8. Implement components in the ORDER they appear in the vision spec
 
 🚫 COMMON MISTAKES TO AVOID:
 - Adding extra features not in the design (fancy animations, complex state management)
@@ -191,14 +221,19 @@ console.log('Hello');
 - Adding components not shown in the sketch (extra buttons, navbars, footers)
 - Deviating from specified colors/fonts/spacing
 - Over-complicating simple designs
+- Skipping components from the vision spec
 
-✅ BEFORE SUBMITTING, VERIFY:
-- All elements from spec are present (no missing components)
-- No extra elements added (only what's in the sketch)
-- Colors match exactly (use hex codes from spec)
-- Spacing/sizing matches visual proportions
-- Text content is word-for-word accurate
-- Tech stack matches recommendation (don't use React if vanilla JS was recommended)
+✅ IMPLEMENTATION CHECKLIST (Verify each item):
+□ All components from vision spec are implemented (list them)
+□ No extra components added beyond spec
+□ All colors match hex codes from spec
+□ All spacing values match spec (margins, padding, gaps)
+□ All typography matches (font-family, size, weight, line-height)
+□ Text content is word-for-word accurate
+□ Layout structure matches (grid, flexbox, positioning)
+□ Tech stack matches recommendation
+□ Border radius, shadows, effects match spec
+□ Responsive breakpoints implemented if specified
 
 """
 
