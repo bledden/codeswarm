@@ -130,7 +130,7 @@ Your analysis MUST include:
    - ✓ Layout structure matches (grid, flexbox, positioning)
    - ✓ Text content is word-for-word accurate
 
-Provide a comprehensive technical specification with EXACT values wherever possible. Avoid vague terms like "medium padding" - use "24px padding" instead.
+Provide a comprehensive technical specification with EXACT values wherever possible. Avoid vague terms like "medium padding" - use "24px padding" instead."""
 
         return prompt
 
