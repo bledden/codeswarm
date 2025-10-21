@@ -120,6 +120,20 @@ class GitHubClient:
                 check=True
             )
 
+            # Configure git user (required for commits)
+            subprocess.run(
+                ["git", "config", "user.name", "CodeSwarm"],
+                cwd=temp_dir,
+                capture_output=True,
+                check=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "codeswarm@localhost"],
+                cwd=temp_dir,
+                capture_output=True,
+                check=True
+            )
+
             # Add all files
             subprocess.run(
                 ["git", "add", "."],
