@@ -326,7 +326,7 @@ async def main():
                         print("  For now, you can:")
                         print(f"  1. Check Daytona console: https://app.daytona.io")
                         print(f"  2. Manually restart the sandbox")
-                        print(f"  3. Download files locally from output/ directory\n")
+                        print(f"  3. Download files locally from results/generated_code/ directory\n")
 
                         # Future Phase 5: Automatic retry logic
                         # retry = input("  Retry deployment? (y/n): ").strip().lower()

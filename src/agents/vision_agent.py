@@ -213,7 +213,7 @@ Provide a comprehensive technical specification that architecture and implementa
                 from pathlib import Path
                 import time
 
-                output_dir = Path("output") / f"vision_{int(time.time())}"
+                output_dir = Path("results/vision_analysis") / f"vision_{int(time.time())}"
                 output_dir.mkdir(parents=True, exist_ok=True)
 
                 vision_file = output_dir / "vision_analysis.txt"

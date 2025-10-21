@@ -67,10 +67,12 @@ cache/
 .cache/
 *.cache
 
-# Output directories
-demo_output/*.json
-demo_output/*.txt
-!demo_output/.gitkeep
+# Output directories (now consolidated under results/)
+results/generated_code/*.json
+results/generated_code/code_*/
+results/generated_code/*/node_modules/
+results/test_logs/
+results/vision_analysis/
 
 # Temporary files
 *.tmp
@@ -97,13 +99,6 @@ archive/
 # IDE history files (may contain sensitive data)
 .history/
 .vscode-history/
-
-# CLI cache and output
-cache/cli_*.json
-output/*.json
-output/code_*/
-!output/.gitkeep
-output/*/node_modules/
 
 # Analysis and comparison documents
 BROWSER_USE_VS_TAVILY_DEEP_DIVE.md
