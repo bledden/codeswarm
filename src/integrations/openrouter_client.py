@@ -188,87 +188,113 @@ class OpenRouterClient:
     async def _standard_completion(
         self,
         payload: Dict[str, Any],
-        start_time: float
+        start_time: float,
+        max_retries: int = 3
     ) -> Dict[str, Any]:
-        """Standard non-streaming completion"""
+        """Standard non-streaming completion with retry logic"""
         # Don't auto-close sessions - let the caller manage lifecycle
         # If no session exists, create one that persists
         if not self.session:
             await self.create_session_if_needed()
 
-        try:
-            async with self.session.post(
-                f"{self.BASE_URL}/chat/completions",
-                headers=self.headers,
-                json=payload
-            ) as response:
-                response_data = await response.json()
+        last_error = None
 
-            # CRITICAL: Check if response_data is None (transient API error)
-            if response_data is None:
-                error_msg = f"OpenRouter API returned None (HTTP {response.status}) - likely transient error"
-                logger.error(error_msg)
-                raise Exception(error_msg)
+        for attempt in range(max_retries):
+            try:
+                async with self.session.post(
+                    f"{self.BASE_URL}/chat/completions",
+                    headers=self.headers,
+                    json=payload
+                ) as response:
+                    response_data = await response.json()
 
-            if response.status != 200:
-                error_msg = response_data.get("error", {}).get("message", "Unknown error")
-                raise Exception(f"OpenRouter API error: {error_msg}")
+                # CRITICAL: Check if response_data is None (transient API error)
+                if response_data is None:
+                    error_msg = f"OpenRouter API returned None (HTTP {response.status}) - transient error (attempt {attempt + 1}/{max_retries})"
+                    logger.warning(error_msg)
+                    last_error = error_msg
 
-            # Calculate latency
-            latency_ms = int((time.time() - start_time) * 1000)
+                    # Exponential backoff: 2s, 4s, 8s
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** (attempt + 1)
+                        logger.info(f"Retrying in {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        # Final attempt failed
+                        raise Exception(f"{error_msg} - all retries exhausted")
 
-            # Extract usage information
-            usage = response_data.get("usage", {})
-            
-            # Enhanced handling for GPT-5 and other models with reasoning
-            choices = response_data.get("choices", [])
-            
-            # Check if this is GPT-5 or similar model with reasoning capabilities
-            if choices and "message" in choices[0]:
-                message = choices[0]["message"]
-                
-                # CRITICAL: GPT-5 puts complex responses in reasoning field instead of content
-                # For complex prompts, GPT-5 returns empty content but detailed reasoning
-                content = message.get("content", "")
-                reasoning = message.get("reasoning", "")
-                
-                # If content is empty but reasoning exists (GPT-5 pattern), use reasoning as content
-                if not content and reasoning and payload.get("model") == "openai/gpt-5":
-                    logger.info(f"GPT-5 returned empty content but {len(reasoning)} chars of reasoning - using reasoning as content")
-                    message["content"] = reasoning  # Move reasoning to content field
-                    message["original_content"] = ""  # Preserve original empty content
-                    message["gpt5_mode"] = "reasoning_as_content"
-                
-                # Log if we have reasoning data (for debugging)
-                if message.get("reasoning") or message.get("reasoning_details"):
-                    model_name = payload.get("model", "unknown")
-                    logger.info(f"Model {model_name} returned with reasoning data")
-                    
-                    # Log reasoning summary if available
-                    if message.get("reasoning"):
-                        logger.debug(f"Reasoning summary: {message['reasoning'][:200]}...")
-            
-            result = {
-                "id": response_data.get("id"),
-                "model": response_data.get("model"),
-                "choices": choices,  # This includes all fields including reasoning
-                "usage": {
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0)
-                },
-                "latency_ms": latency_ms,
-                "provider": self._get_provider_from_model(payload["model"])
-            }
-            
-            # Add provider-specific data if present
-            if "provider" in response_data:
-                result["provider_metadata"] = response_data["provider"]
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error in _standard_completion: {e}")
-            raise
+                if response.status != 200:
+                    error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                    raise Exception(f"OpenRouter API error: {error_msg}")
+
+                # Calculate latency
+                latency_ms = int((time.time() - start_time) * 1000)
+
+                # Extract usage information
+                usage = response_data.get("usage", {})
+
+                # Enhanced handling for GPT-5 and other models with reasoning
+                choices = response_data.get("choices", [])
+
+                # Check if this is GPT-5 or similar model with reasoning capabilities
+                if choices and "message" in choices[0]:
+                    message = choices[0]["message"]
+
+                    # CRITICAL: GPT-5 puts complex responses in reasoning field instead of content
+                    # For complex prompts, GPT-5 returns empty content but detailed reasoning
+                    content = message.get("content", "")
+                    reasoning = message.get("reasoning", "")
+
+                    # If content is empty but reasoning exists (GPT-5 pattern), use reasoning as content
+                    if not content and reasoning and payload.get("model") == "openai/gpt-5":
+                        logger.info(f"GPT-5 returned empty content but {len(reasoning)} chars of reasoning - using reasoning as content")
+                        message["content"] = reasoning  # Move reasoning to content field
+                        message["original_content"] = ""  # Preserve original empty content
+                        message["gpt5_mode"] = "reasoning_as_content"
+
+                    # Log if we have reasoning data (for debugging)
+                    if message.get("reasoning") or message.get("reasoning_details"):
+                        model_name = payload.get("model", "unknown")
+                        logger.info(f"Model {model_name} returned with reasoning data")
+
+                        # Log reasoning summary if available
+                        if message.get("reasoning"):
+                            logger.debug(f"Reasoning summary: {message['reasoning'][:200]}...")
+
+                result = {
+                    "id": response_data.get("id"),
+                    "model": response_data.get("model"),
+                    "choices": choices,  # This includes all fields including reasoning
+                    "usage": {
+                        "prompt_tokens": usage.get("prompt_tokens", 0),
+                        "completion_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0)
+                    },
+                    "latency_ms": latency_ms,
+                    "provider": self._get_provider_from_model(payload["model"])
+                }
+
+                # Add provider-specific data if present
+                if "provider" in response_data:
+                    result["provider_metadata"] = response_data["provider"]
+
+                # Success! Return result and break out of retry loop
+                return result
+
+            except Exception as e:
+                # Log error and continue to retry logic
+                logger.error(f"Error in _standard_completion (attempt {attempt + 1}/{max_retries}): {e}")
+                last_error = e
+
+                # Exponential backoff for retries
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** (attempt + 1)
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Final attempt failed - raise the last error
+                    raise last_error
 
     async def _stream_completion(
         self, 
