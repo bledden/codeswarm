@@ -247,6 +247,164 @@ async def main():
         print(f"🚀 Deployed to: {result['deployment_url']}")
         print()
 
+    # PHASE 4: User Feedback Loop
+    if neo4j and result.get('pattern_id'):
+        print("=" * 80)
+        print("  💬 FEEDBACK (helps improve future generations)")
+        print("=" * 80)
+        print()
+
+        try:
+            # Generate session ID
+            import uuid
+            session_id = str(uuid.uuid4())[:8]
+
+            # Ask for feedback
+            code_quality = None
+            context_quality = None
+
+            try:
+                code_input = input("Rate code quality (1-5, or press Enter to skip): ").strip()
+                if code_input and code_input.isdigit():
+                    code_quality = min(max(int(code_input), 1), 5)
+
+                context_input = input("Rate documentation relevance (1-5, or press Enter to skip): ").strip()
+                if context_input and context_input.isdigit():
+                    context_quality = min(max(int(context_input), 1), 5)
+            except (EOFError, KeyboardInterrupt):
+                print("\n  Skipping feedback")
+                code_quality = None
+                context_quality = None
+
+            # Store feedback if provided
+            if code_quality is not None and context_quality is not None:
+                import asyncio
+                await neo4j.store_user_feedback(
+                    session_id=session_id,
+                    pattern_id=result['pattern_id'],
+                    task=task,
+                    code_quality=code_quality,
+                    context_quality=context_quality,
+                    would_retry=False
+                )
+                print(f"  ✅ Feedback saved! Thank you.\n")
+
+                # If context quality is low, offer to identify unhelpful docs
+                if context_quality < 3 and result.get('documentation_urls'):
+                    print("  Which docs seemed irrelevant? (comma-separated numbers, or press Enter to skip)")
+                    for i, url in enumerate(result['documentation_urls'], 1):
+                        # Show domain only for cleaner output
+                        from urllib.parse import urlparse
+                        domain = urlparse(url).netloc
+                        print(f"    {i}. {domain}")
+
+                    try:
+                        unhelpful_input = input("  Unhelpful docs: ").strip()
+                        if unhelpful_input:
+                            indices = [int(x.strip()) - 1 for x in unhelpful_input.split(',') if x.strip().isdigit()]
+                            for idx in indices:
+                                if 0 <= idx < len(result['documentation_urls']):
+                                    url = result['documentation_urls'][idx]
+                                    await neo4j.mark_doc_unhelpful(
+                                        url=url,
+                                        session_id=session_id,
+                                        reason="User marked as irrelevant"
+                                    )
+                            print(f"  ✅ Marked {len(indices)} docs as unhelpful\n")
+                    except (ValueError, EOFError, KeyboardInterrupt):
+                        print("  Skipping doc feedback\n")
+            else:
+                print("  Skipping feedback\n")
+
+            # DEPLOYMENT RETRY: If deployment URL exists, ask if it's working
+            if result.get('deployment_url'):
+                try:
+                    deployment_works = input(f"\nDoes the deployment work? (y/n): ").strip().lower()
+
+                    if deployment_works == 'n':
+                        print("\n  🔄 Deployment retry feature coming in Phase 5!")
+                        print("  For now, you can:")
+                        print(f"  1. Check Daytona console: https://app.daytona.io")
+                        print(f"  2. Manually restart the sandbox")
+                        print(f"  3. Download files locally from output/ directory\n")
+
+                        # Future Phase 5: Automatic retry logic
+                        # retry = input("  Retry deployment? (y/n): ").strip().lower()
+                        # if retry == 'y':
+                        #     await daytona.retry_deployment(workspace_id=...)
+
+                except (EOFError, KeyboardInterrupt):
+                    print("\n  Skipping deployment check")
+
+            # PHASE 5: GitHub Integration
+            try:
+                from src.integrations.github_client import GitHubClient
+
+                github = GitHubClient()
+
+                # Check authentication, prompt if needed
+                authenticated = github.is_authenticated()
+                just_authenticated = False  # Track if user just authenticated
+
+                if not authenticated:
+                    # Offer to authenticate
+                    push_prompt = input("\n📦 Push code to GitHub? (requires authentication) (y/n): ").strip().lower()
+                    if push_prompt == 'y':
+                        authenticated = github.prompt_authentication()
+                        just_authenticated = authenticated  # Mark that we just authenticated
+
+                # If authenticated (or just authenticated), proceed with push
+                if authenticated:
+                    # Only ask if they didn't just authenticate (they already said yes)
+                    if not just_authenticated:
+                        push_to_github = input("\n📦 Push code to GitHub? (y/n): ").strip().lower()
+                    else:
+                        # They just authenticated, so we know they want to push
+                        push_to_github = 'y'
+
+                    if push_to_github == 'y':
+                        repo_name = input("  Repository name: ").strip()
+
+                        if repo_name:
+                            make_private = input("  Make repository private? (y/n, default: n): ").strip().lower()
+                            private = make_private == 'y'
+
+                            print(f"\n  🚀 Creating GitHub repository...")
+
+                            # Get files from output directory
+                            output_files = {}
+                            if 'files' in result:
+                                output_files = result['files']
+
+                            github_result = await github.create_and_push_repository(
+                                repo_name=repo_name,
+                                files=output_files,
+                                description=f"CodeSwarm generated: {task[:100]}",
+                                private=private,
+                                task=task
+                            )
+
+                            if github_result['success']:
+                                print(f"  ✅ Repository created: {github_result['url']}\n")
+
+                                # Store GitHub URL in Neo4j
+                                if neo4j and result.get('pattern_id'):
+                                    await neo4j.link_github_url_to_pattern(
+                                        pattern_id=result['pattern_id'],
+                                        github_url=github_result['url']
+                                    )
+                                    print(f"  ✅ GitHub URL linked to pattern\n")
+                            else:
+                                print(f"  ❌ Failed to create repository: {github_result['error']}\n")
+
+            except (EOFError, KeyboardInterrupt):
+                print("\n  Skipping GitHub push")
+            except Exception as e:
+                print(f"  ⚠️  GitHub integration error: {e}\n")
+
+        except Exception as e:
+            print(f"  ⚠️  Feedback error: {e}\n")
+
     print("✨ Thank you for using CodeSwarm!")
     print()
 

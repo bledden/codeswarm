@@ -33,7 +33,7 @@ class TestingAgent(BaseAgent):
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.4,  # Low-medium temperature for consistent tests
-            max_tokens=6000  # More tokens for comprehensive test suites
+            max_tokens=12000  # Increased for comprehensive multi-file test suites
         )
 
     def get_system_prompt(self) -> str:

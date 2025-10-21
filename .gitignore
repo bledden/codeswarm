@@ -92,7 +92,6 @@ docs/session-notes/
 # Backup files
 *.bak
 *~
-docs/
 archive/
 
 # IDE history files (may contain sensitive data)

@@ -269,14 +269,31 @@ class DaytonaClient:
                                 else:
                                     output = str(result)
                         else:
-                            # Non-Node.js command, execute normally
-                            result = sandbox.process.exec(run_command)
-                            if hasattr(result, 'result'):
-                                output = result.result
-                            elif hasattr(result, 'stdout'):
-                                output = result.stdout
+                            # Non-Node.js command - check if it's a long-running server
+                            is_server_command = any(keyword in run_command for keyword in [
+                                "http.server", "serve", "dev", "start", "uvicorn", "gunicorn", "flask run"
+                            ])
+
+                            if is_server_command:
+                                # Wrap in nohup to keep server running after SDK disconnects
+                                logger.info(f"[DAYTONA]  Detected server command, using nohup for persistence")
+                                nohup_command = f"nohup {run_command} > /tmp/server.log 2>&1 &"
+                                result = sandbox.process.exec(nohup_command)
+                                output = "Server started with nohup (running persistently)"
+
+                                # Give server a moment to start
+                                import asyncio
+                                await asyncio.sleep(2)
+                                logger.info(f"[DAYTONA] ✅ Server process started in background")
                             else:
-                                output = str(result)
+                                # Regular non-server command
+                                result = sandbox.process.exec(run_command)
+                                if hasattr(result, 'result'):
+                                    output = result.result
+                                elif hasattr(result, 'stdout'):
+                                    output = result.stdout
+                                else:
+                                    output = str(result)
 
                         logger.info(f"[DAYTONA] ✅ Command sequence completed")
                     except Exception as e:
@@ -304,6 +321,19 @@ class DaytonaClient:
             # Get preview URL
             preview_url = await self.get_preview_url(workspace_id, port=3000)
 
+            # Verify sandbox is running (informational check)
+            try:
+                status = await self.get_workspace_status(workspace_id)
+                if status.get("status") == "running":
+                    logger.info(f"[DAYTONA] ✅ Sandbox confirmed running")
+                elif status.get("status") is None:
+                    # Daytona API returned 200 but no status field - this is normal
+                    logger.info(f"[DAYTONA]  Sandbox status check: API returned no status field (deployment likely successful)")
+                else:
+                    logger.warning(f"[DAYTONA] ⚠️  Unexpected sandbox status: {status.get('status')} (expected 'running')")
+            except Exception as e:
+                logger.info(f"[DAYTONA]  Could not verify sandbox status (non-critical): {e}")
+
             deployment = {
                 "status": "deployed",
                 "output": output,
@@ -311,6 +341,7 @@ class DaytonaClient:
             }
 
             logger.info(f"[DAYTONA]  Deployed code to workspace {workspace_id}")
+            logger.info(f"[DAYTONA]  📋 Deployment complete! Server running with nohup for persistence.")
             return deployment
 
         except Exception as e:

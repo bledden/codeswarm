@@ -6,7 +6,7 @@ Role: Generate production-quality code based on architecture
 Model: openai/gpt-5-pro (flagship code generation)
 """
 
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 import re
 from .base_agent import BaseAgent
 
@@ -33,224 +33,73 @@ class ImplementationAgent(BaseAgent):
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.5,  # Lower temperature for more consistent code
-            max_tokens=6000  # More tokens for longer code
+            max_tokens=16000  # Increased for modern multi-file projects (React/TypeScript)
         )
-        # Track validation errors across iterations for improvement feedback
-        self._last_validation_error = None
 
-    async def execute(
+    async def _validate_output(
         self,
-        task: str,
+        code: str,
+        reasoning: str,
         context: Dict[str, Any],
-        quality_threshold: float = 90.0,
-        max_iterations: int = 3
-    ):
+        task: str
+    ) -> Optional[Dict[str, Any]]:
         """
-        Override base execute() to add file validation after code generation.
+        Validate that generated code can be parsed into files
+        and all imports/references point to existing files.
 
-        Validates that:
-        1. Code can be parsed into individual files
-        2. All imports/references point to files that exist
-
-        If validation fails, adds error to context and retries.
+        Returns:
+            None if validation passes, or error dict if validation fails
         """
-        from .base_agent import AgentOutput
-        import time
+        try:
+            # Parse code into files
+            parsed_files = self._parse_code_to_files(code)
 
-        print(f"\n[{self.name.upper()}]  Starting execution with file validation...")
+            # Validate imports
+            missing_files = self._validate_file_imports(parsed_files)
 
-        iteration = 0
-        best_output = None
-        best_score = 0.0
+            if missing_files:
+                # Validation failed
+                print(f"[{self.name.upper()}]  ❌ VALIDATION FAILED: {len(missing_files)} missing file references!")
+                for source_file, missing_import in missing_files[:5]:  # Show first 5
+                    print(f"[{self.name.upper()}]      {source_file} → {missing_import}")
 
-        while iteration < max_iterations:
-            iteration += 1
-            print(f"[{self.name.upper()}]  Iteration {iteration}/{max_iterations}")
+                if len(missing_files) > 5:
+                    print(f"[{self.name.upper()}]      ... and {len(missing_files) - 5} more")
 
-            start_time = time.time()
-
-            # Build prompt (add validation error feedback if retrying)
-            if iteration == 1 or best_output is None:
-                # First iteration OR previous iteration failed validation (no output created)
-                user_prompt = self.build_user_prompt(task, context)
-
-                # If retrying after validation failure, add error feedback
-                if iteration > 1 and self._last_validation_error:
-                    error = self._last_validation_error
-
-                    if "missing_files" in error:
-                        missing_files = error["missing_files"]
-                        user_prompt += f"""
-
-❌ PREVIOUS ATTEMPT FAILED VALIDATION:
-Your code references {len(missing_files)} files that you did not create!
-
-Missing files:
-"""
-                        for source_file, missing_import in missing_files[:5]:
-                            user_prompt += f"  - {source_file} imports '{missing_import}' (FILE NOT FOUND)\n"
-
-                        if len(missing_files) > 5:
-                            user_prompt += f"  ... and {len(missing_files) - 5} more\n"
-
-                        user_prompt += """
-FIX REQUIRED:
-1. Generate ALL files that are referenced in imports, links, or requires
-2. If you import "../css/responsive.css", you MUST create "# File: css/responsive.css"
-3. If HTML references <script src="../js/main.js">, you MUST create "# File: js/main.js"
-4. Do NOT reference files you haven't created
-5. Every import/require MUST point to an actual file you generated
-"""
-
-                    elif "parsing_error" in error:
-                        user_prompt += f"""
-
-❌ PREVIOUS ATTEMPT FAILED PARSING:
-Your code could not be parsed into files!
-
-Error: {error["parsing_error"]}
-
-FIX REQUIRED:
-1. Use proper file markers: "# File: filename.ext" or "// File: filename.ext"
-2. Each file MUST start with a file marker
-3. Follow the format shown in the system prompt exactly
-"""
-            else:
-                # Normal improvement iteration (has previous successful output)
-                user_prompt = self._build_improvement_prompt(
-                    task, context, best_output, best_score
-                )
-
-            # Call model
-            messages = [
-                {"role": "system", "content": self.get_system_prompt()},
-                {"role": "user", "content": user_prompt}
-            ]
-
-            response = await self.client.complete(
-                model=self.model,
-                messages=messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-
-            latency_ms = int((time.time() - start_time) * 1000)
-
-            # Parse response
-            content = response["choices"][0]["message"]["content"]
-            code, reasoning = self._parse_response(content)
-
-            # CRITICAL VALIDATION: Check for empty outputs
-            if not code or not code.strip():
-                print(f"[{self.name.upper()}]  ❌ ERROR: Empty code output detected!")
-                if iteration >= max_iterations:
-                    raise ValueError(f"{self.name} agent produced empty code after {max_iterations} iterations")
-                print(f"[{self.name.upper()}]  Retrying in next iteration...")
-                continue
-
-            if not reasoning or not reasoning.strip():
-                print(f"[{self.name.upper()}]  ⚠️  WARNING: Empty reasoning (code is present, continuing)")
-
-            # CRITICAL: Parse and validate files BEFORE creating output
-            try:
-                parsed_files = self._parse_code_to_files(code)
-
-                # Validate imports
-                missing_files = self._validate_file_imports(parsed_files)
-
-                if missing_files:
-                    # Validation failed - prepare for retry
-                    print(f"[{self.name.upper()}]  ❌ VALIDATION FAILED: {len(missing_files)} missing file references!")
-                    for source_file, missing_import in missing_files:
-                        print(f"[{self.name.upper()}]      {source_file} → {missing_import}")
-
-                    # Store error for next iteration
-                    self._last_validation_error = {
-                        "missing_files": missing_files,
-                        "message": f"Generated code references {len(missing_files)} files that don't exist"
-                    }
-
-                    # If this is the last iteration, raise error
-                    if iteration >= max_iterations:
-                        raise ValueError(
-                            f"Implementation generated incomplete code after {max_iterations} attempts. "
-                            f"Missing {len(missing_files)} file references: {missing_files[:3]}"
-                        )
-
-                    # Otherwise, continue to next iteration
-                    print(f"[{self.name.upper()}]  🔄 Retrying with validation feedback...")
-                    continue
-
-                # Validation passed!
-                print(f"[{self.name.upper()}]  ✅ File validation passed ({len(parsed_files)} files, all imports valid)")
-                self._last_validation_error = None  # Clear error
-
-            except ValueError as e:
-                # Parsing failed
-                print(f"[{self.name.upper()}]  ❌ FILE PARSING FAILED: {e}")
-
-                self._last_validation_error = {
-                    "parsing_error": str(e),
-                    "message": "Failed to parse code into files"
+                return {
+                    "missing_files": missing_files,
+                    "message": f"Generated code references {len(missing_files)} files that don't exist"
                 }
 
-                if iteration >= max_iterations:
-                    raise ValueError(f"Implementation failed to generate parseable code after {max_iterations} attempts: {e}")
+            # Validate minimum required files for framework
+            missing_required = self._validate_required_files(parsed_files)
 
-                print(f"[{self.name.upper()}]  🔄 Retrying with parsing feedback...")
-                continue
+            if missing_required:
+                # Validation failed - missing critical files
+                print(f"[{self.name.upper()}]  ❌ VALIDATION FAILED: Missing {len(missing_required)} required files!")
+                for required_file in missing_required[:5]:
+                    print(f"[{self.name.upper()}]      Missing: {required_file}")
 
-            # Create output with parsed_files
-            output = AgentOutput(
-                agent_name=self.name,
-                code=code,
-                reasoning=reasoning,
-                confidence=0.85,
-                latency_ms=latency_ms,
-                model_used=self.model,
-                iterations=iteration,
-                parsed_files=parsed_files  # Include validated files
-            )
+                if len(missing_required) > 5:
+                    print(f"[{self.name.upper()}]      ... and {len(missing_required) - 5} more")
 
-            # Evaluate with Galileo if available
-            if self.evaluator:
-                try:
-                    usage = response.get("usage", {})
-                    input_tokens = usage.get("prompt_tokens", 0)
-                    output_tokens = usage.get("completion_tokens", 0)
+                return {
+                    "missing_required_files": missing_required,
+                    "message": f"Project is missing {len(missing_required)} required files and won't run"
+                }
 
-                    score = await self.evaluator.evaluate(
-                        task=task,
-                        output=code,
-                        agent=self.name,
-                        model=self.model,
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                        latency_ms=latency_ms
-                    )
-                    output.galileo_score = score
-                    print(f"[{self.name.upper()}]  Galileo score: {score:.1f}/100")
+            # Validation passed - store parsed files for deployment
+            print(f"[{self.name.upper()}]  ✅ File validation passed ({len(parsed_files)} files, all imports valid)")
+            self._parsed_files = parsed_files
+            return None
 
-                    # Update best if better
-                    if score > best_score:
-                        best_score = score
-                        best_output = output
-
-                    # Check quality threshold
-                    if score >= quality_threshold:
-                        print(f"[{self.name.upper()}]  Quality threshold met ({score:.1f} >= {quality_threshold})")
-                        return output
-
-                except Exception as e:
-                    print(f"[{self.name.upper()}]  Galileo evaluation failed: {e}")
-                    output.galileo_score = 85.0
-            else:
-                output.galileo_score = 85.0
-                return output
-
-        # Max iterations reached
-        print(f"[{self.name.upper()}] ⏸  Max iterations reached. Best score: {best_score:.1f}/100")
-        return best_output if best_output else output
+        except ValueError as e:
+            # Parsing failed
+            print(f"[{self.name.upper()}]  ❌ FILE PARSING FAILED: {e}")
+            return {
+                "parsing_error": str(e),
+                "message": "Failed to parse code into files"
+            }
 
     def get_system_prompt(self) -> str:
         return """You are an expert software engineer with mastery of:
@@ -322,6 +171,22 @@ console.log('Hello');
 
 """
 
+        # PRIORITY: Vision analysis comes FIRST for image-to-code tasks
+        if vision_analysis:
+            prompt += f"""🎨 VISUAL DESIGN SPECIFICATION (PRIMARY - MUST IMPLEMENT EXACTLY):
+{vision_analysis}
+
+⚠️  CRITICAL: Your implementation MUST match this visual design pixel-for-pixel.
+Pay special attention to:
+- Exact colors, fonts, sizes specified
+- Layout structure (grid, flexbox, spacing)
+- All UI components mentioned
+- Visual hierarchy and positioning
+- Responsive breakpoints
+- Border styles, shadows, effects
+
+"""
+
         # Architecture is REQUIRED - this prevents synthesis conflicts
         if architecture:
             prompt += f"""Architecture Specification (MUST FOLLOW):
@@ -331,13 +196,6 @@ console.log('Hello');
         else:
             prompt += """  WARNING: No architecture specification provided.
 You MUST create a simple, working implementation that follows best practices.
-
-"""
-
-        # Add vision analysis if available
-        if vision_analysis:
-            prompt += f"""Vision Analysis (from sketch/mockup):
-{vision_analysis}
 
 """
 
@@ -366,78 +224,7 @@ Provide complete, runnable, production-ready code."""
 
         return prompt
 
-    def _build_improvement_prompt(
-        self,
-        task: str,
-        context: Dict[str, Any],
-        previous_output,
-        previous_score: float
-    ) -> str:
-        """Build improvement prompt with validation error feedback"""
-        base_prompt = self.build_user_prompt(task, context)
-
-        improvement = f"""
-PREVIOUS ATTEMPT (Score: {previous_score:.1f}/100):
-```
-{previous_output.code[:500]}...
-```
-
-Your previous code scored {previous_score:.1f}/100, which is below the quality threshold of 90.
-"""
-
-        # Add validation error feedback if present
-        if self._last_validation_error:
-            error = self._last_validation_error
-
-            if "missing_files" in error:
-                missing_files = error["missing_files"]
-                improvement += f"""
-❌ CRITICAL FILE VALIDATION ERROR:
-Your code references {len(missing_files)} files that you did not create!
-
-Missing files:
-"""
-                for source_file, missing_import in missing_files[:5]:  # Show first 5
-                    improvement += f"  - {source_file} imports '{missing_import}' (FILE NOT FOUND)\n"
-
-                if len(missing_files) > 5:
-                    improvement += f"  ... and {len(missing_files) - 5} more\n"
-
-                improvement += """
-FIX REQUIRED:
-1. Generate ALL files that are referenced in imports, links, or requires
-2. If you import "./styles.css", you MUST create a file marked as "# File: styles.css"
-3. If HTML references <script src="app.js">, you MUST create "# File: app.js"
-4. Do NOT reference files you haven't created
-5. Every import/require MUST point to an actual file you generated
-
-"""
-
-            elif "parsing_error" in error:
-                improvement += f"""
-❌ CRITICAL PARSING ERROR:
-Your code could not be parsed into individual files!
-
-Error: {error["parsing_error"]}
-
-FIX REQUIRED:
-1. Use proper file markers: "# File: filename.ext" or "// File: filename.ext"
-2. Each file MUST start with a file marker
-3. Follow the format shown in the system prompt exactly
-
-"""
-
-        improvement += f"""
-IMPROVEMENT REQUIRED:
-1. Review your previous attempt and the errors above
-2. Generate COMPLETE code with ALL referenced files
-3. Ensure ALL imports/requires point to files you create
-4. Follow proper file marker format
-5. Ensure score >= 90/100
-
-{base_prompt}
-"""
-        return improvement
+    # NOTE: _build_improvement_prompt removed - base class now handles validation error feedback
 
     def _parse_response(self, content: str) -> Tuple[str, str]:
         """
@@ -697,15 +484,25 @@ IMPROVEMENT REQUIRED:
                 matches = re.findall(pattern, content)
 
                 for import_path in matches:
+                    original_import = import_path  # Store for error reporting
+                    is_path_alias = False
+
                     # Skip external imports (URLs, node_modules, absolute packages)
                     if any(skip in import_path for skip in [
-                        'http://', 'https://', 'node_modules', '@/',
-                        'react', 'vue', 'next', 'vite', 'express'
+                        'http://', 'https://', 'node_modules',
+                        'react', 'vue', 'next', 'vite', 'express', '@vercel', '@sentry', '@upstash'
                     ]):
                         continue
 
+                    # Handle TypeScript path aliases (@/ → resolve to project root)
+                    if import_path.startswith('@/'):
+                        # @/ typically maps to the project root or src/
+                        # Convert @/components/Header to components/Header
+                        import_path = import_path[2:]  # Remove @/
+                        is_path_alias = True
+
                     # Skip absolute imports (e.g., Python standard library)
-                    if not import_path.startswith('.') and not import_path.startswith('/'):
+                    if not import_path.startswith('.') and not import_path.startswith('/') and not is_path_alias:
                         # Unless it's a local file reference in HTML
                         if source_file.endswith('.html') and not import_path.startswith('http'):
                             pass  # Check these
@@ -732,6 +529,8 @@ IMPROVEMENT REQUIRED:
                             f"{full_path}.tsx",
                             f"{full_path}/index.js",
                             f"{full_path}/index.jsx",
+                            f"{full_path}/index.ts",  # TypeScript index files
+                            f"{full_path}/index.tsx",  # TypeScript React index files
                         ])
 
                     # Check if any variant exists in generated files
@@ -755,11 +554,95 @@ IMPROVEMENT REQUIRED:
 
                     if not found:
                         # Only report if it looks like a local file import
-                        if import_path.startswith('.') or (
+                        if import_path.startswith('.') or is_path_alias or (
                             source_file.endswith('.html') and
                             not import_path.startswith('http') and
                             any(import_path.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.svg'])
                         ):
-                            missing_files.append((source_file, import_path))
+                            # Report using original import path (with @/ if it had one)
+                            missing_files.append((source_file, original_import))
 
         return missing_files
+
+    def _validate_required_files(self, files: Dict[str, str]) -> List[str]:
+        """
+        Validate that the project has minimum required files to actually run.
+
+        Detects project type and checks for critical files that must exist.
+        This prevents deploying incomplete projects (e.g., Next.js with only config files).
+
+        Returns:
+            List of missing required files (empty list if all present)
+        """
+        filenames = list(files.keys())
+        missing = []
+
+        # Detect Next.js project
+        if 'package.json' in filenames and 'next' in files['package.json'].lower():
+            # Next.js requires at minimum:
+            # - app/page.tsx or pages/index.tsx (entry point)
+            # - app/layout.tsx or pages/_app.tsx (layout/wrapper)
+
+            has_app_router = any(f.startswith('app/') or f.startswith('src/app/') for f in filenames)
+            has_pages_router = any(f.startswith('pages/') or f.startswith('src/pages/') for f in filenames)
+
+            if has_app_router or not has_pages_router:
+                # Using App Router (Next.js 13+)
+                has_page = any(
+                    f in filenames
+                    for f in ['app/page.tsx', 'app/page.jsx', 'src/app/page.tsx', 'src/app/page.jsx']
+                )
+                has_layout = any(
+                    f in filenames
+                    for f in ['app/layout.tsx', 'app/layout.jsx', 'src/app/layout.tsx', 'src/app/layout.jsx']
+                )
+
+                if not has_page:
+                    missing.append('app/page.tsx (or src/app/page.tsx)')
+                if not has_layout:
+                    missing.append('app/layout.tsx (or src/app/layout.tsx)')
+            else:
+                # Using Pages Router (Next.js <13)
+                has_index = any(
+                    f in filenames
+                    for f in ['pages/index.tsx', 'pages/index.jsx', 'src/pages/index.tsx', 'src/pages/index.jsx']
+                )
+
+                if not has_index:
+                    missing.append('pages/index.tsx (or src/pages/index.tsx)')
+
+        # Detect static HTML project
+        elif any(f.endswith('.html') for f in filenames):
+            # Static HTML requires at least one .html file (already have it)
+            pass
+
+        # Detect React/Vite project
+        elif 'package.json' in filenames and 'vite' in files['package.json'].lower():
+            # Vite requires index.html and src/main.tsx
+            if 'index.html' not in filenames:
+                missing.append('index.html')
+
+            has_main = any(
+                f in filenames
+                for f in ['src/main.tsx', 'src/main.jsx', 'src/index.tsx', 'src/index.jsx']
+            )
+            if not has_main:
+                missing.append('src/main.tsx (or src/main.jsx)')
+
+        # Detect Express API
+        elif 'package.json' in filenames and 'express' in files['package.json'].lower():
+            # Express requires server file
+            has_server = any(
+                f in filenames
+                for f in ['server.js', 'index.js', 'app.js', 'src/server.js', 'src/index.js']
+            )
+            if not has_server:
+                missing.append('server.js (or index.js/app.js)')
+
+        # Detect Python projects
+        elif any(f.endswith('.py') for f in filenames):
+            # Python web apps should have main/app/server file
+            # But allow any .py file for flexibility
+            pass
+
+        return missing
