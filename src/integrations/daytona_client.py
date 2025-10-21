@@ -247,16 +247,35 @@ class DaytonaClient:
                                 # Execute each command separately with proper error handling
                                 for i, cmd in enumerate(commands, 1):
                                     logger.info(f"[DAYTONA]  [{i}/{len(commands)}] Running: {cmd}")
+
+                                    # Check if this is a server command that should run in background
+                                    is_server_cmd = any(keyword in cmd for keyword in ["dev", "start", "serve"])
+                                    is_install_cmd = any(keyword in cmd for keyword in ["install", "npm i", "yarn add"])
+
                                     try:
-                                        result = sandbox.process.exec(cmd)
-                                        if hasattr(result, 'exit_code') and result.exit_code != 0:
-                                            logger.warning(f"[DAYTONA] ⚠️  Command failed with exit code {result.exit_code}")
+                                        if is_server_cmd:
+                                            # Use nohup for server commands so they persist
+                                            nohup_cmd = f"nohup {cmd} > /tmp/server.log 2>&1 &"
+                                            result = sandbox.process.exec(nohup_cmd)
+                                            # Give server time to start
+                                            import asyncio
+                                            await asyncio.sleep(3)
+                                            logger.info(f"[DAYTONA] ✅ Server started in background with nohup")
+                                        else:
+                                            # Regular command (install, build, etc) - wait for completion
+                                            result = sandbox.process.exec(cmd)
+                                            if hasattr(result, 'exit_code') and result.exit_code != 0:
+                                                logger.error(f"[DAYTONA] ❌ Command failed with exit code {result.exit_code}")
+                                                if is_install_cmd:
+                                                    raise Exception(f"Install command failed - cannot continue")
                                     except Exception as e:
-                                        # Log warning but continue - some commands timeout but still succeed
-                                        logger.warning(f"[DAYTONA] ⚠️  Command execution warning: {e}")
-                                        # For dev server commands that timeout, this is expected (server runs indefinitely)
-                                        if "dev" in cmd or "start" in cmd:
+                                        # Only continue on timeout for server commands
+                                        if is_server_cmd:
                                             logger.info(f"[DAYTONA]  Dev server started in background (timeout expected)")
+                                        else:
+                                            # Install/build commands should not fail
+                                            logger.error(f"[DAYTONA] ❌ Critical command failed: {e}")
+                                            raise Exception(f"Failed to execute '{cmd}': {e}")
 
                                 output = "Commands executed in sequence"
                             else:
