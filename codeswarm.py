@@ -324,25 +324,78 @@ async def main():
             else:
                 print("  Skipping feedback\n")
 
-            # DEPLOYMENT RETRY: If deployment URL exists, ask if it's working
-            if result.get('deployment_url'):
-                try:
-                    deployment_works = input(f"\nDoes the deployment work? (y/n): ").strip().lower()
+            # ITERATIVE REFINEMENT: Offer to refine the generated code
+            try:
+                refine_input = input("\n🔄 Would you like to refine this code? (y/n): ").strip().lower()
 
-                    if deployment_works == 'n':
-                        print("\n  🔄 Deployment retry feature coming in Phase 5!")
-                        print("  For now, you can:")
-                        print(f"  1. Check Daytona console: https://app.daytona.io")
-                        print(f"  2. Manually restart the sandbox")
-                        print(f"  3. Download files locally from results/generated_code/ directory\n")
+                if refine_input == 'y':
+                    refinement_request = input("What changes would you like to make? ").strip()
 
-                        # Future Phase 5: Automatic retry logic
-                        # retry = input("  Retry deployment? (y/n): ").strip().lower()
-                        # if retry == 'y':
-                        #     await daytona.retry_deployment(workspace_id=...)
+                    if refinement_request:
+                        print("\n" + "=" * 80)
+                        print("  🔄 ITERATIVE REFINEMENT")
+                        print("=" * 80)
+                        print(f"\n📝 Refinement Request: {refinement_request}\n")
 
-                except (EOFError, KeyboardInterrupt):
-                    print("\n  Skipping deployment check")
+                        # Construct refinement task
+                        refinement_task = f"{refinement_request}\n\nBased on this existing code:\n{result.get('code', '')[:2000]}..."
+
+                        # Re-run workflow with previous code as context
+                        print("🔄 Running full sequential workflow with refinement...")
+                        refinement_result = await workflow.execute(
+                            task=refinement_task,
+                            user_id="demo-user",
+                            image_path=image_path,  # Reuse original image if present
+                            scrape_docs=True,
+                            deploy=True,
+                            rag_pattern_limit=args.rag_limit
+                        )
+
+                        # Update result for next iteration
+                        result = refinement_result
+
+                        print("\n✅ Refinement complete!")
+                        if refinement_result.get('deployment_url'):
+                            print(f"🚀 New deployment: {refinement_result['deployment_url']}")
+
+                        # Loop back to feedback (recursive refinement)
+                        continue_refining = True
+                        while continue_refining:
+                            try:
+                                another_refinement = input("\n🔄 Refine again? (y/n): ").strip().lower()
+                                if another_refinement != 'y':
+                                    continue_refining = False
+                                    break
+
+                                next_refinement = input("What else would you like to change? ").strip()
+                                if next_refinement:
+                                    print("\n" + "=" * 80)
+                                    print("  🔄 ADDITIONAL REFINEMENT")
+                                    print("=" * 80)
+                                    print(f"\n📝 Request: {next_refinement}\n")
+
+                                    next_task = f"{next_refinement}\n\nBased on this existing code:\n{result.get('code', '')[:2000]}..."
+
+                                    result = await workflow.execute(
+                                        task=next_task,
+                                        user_id="demo-user",
+                                        image_path=image_path,
+                                        scrape_docs=True,
+                                        deploy=True,
+                                        rag_pattern_limit=args.rag_limit
+                                    )
+
+                                    print("\n✅ Refinement complete!")
+                                    if result.get('deployment_url'):
+                                        print(f"🚀 New deployment: {result['deployment_url']}")
+                                else:
+                                    continue_refining = False
+                            except (EOFError, KeyboardInterrupt):
+                                print("\n  Ending refinement loop")
+                                continue_refining = False
+
+            except (EOFError, KeyboardInterrupt):
+                print("\n  Skipping refinement")
 
             # PHASE 5: GitHub Integration
             try:
