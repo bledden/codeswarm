@@ -34,7 +34,7 @@ class VisionAgent(BaseAgent):
             openrouter_client=openrouter_client,
             evaluator=evaluator,
             temperature=0.6,  # Balanced for creative interpretation
-            max_tokens=3000
+            max_tokens=8000  # Increased for comprehensive image analysis with exact text extraction
         )
 
     def get_system_prompt(self) -> str:
@@ -68,69 +68,69 @@ CRITICAL:
     def build_user_prompt(self, task: str, context: Dict[str, Any]) -> str:
         prompt = f"""Task: {task}
 
-Analyze the provided image (sketch/mockup/screenshot) and provide a PIXEL-PERFECT technical specification that will be used to build the exact design shown.
+Analyze this image and extract EXACT specifications. The implementation agent will build EXACTLY what you describe - no more, no less.
 
-⚠️  CRITICAL: Be extremely specific with measurements, colors, spacing, and layout. The implementation agent will follow your specs EXACTLY.
+⚠️  START WITH TEXT CONTENT - This is the most important part! List every word/label visible in the image.
 
-Your analysis MUST include:
+**1. TEXT CONTENT (Word-for-Word)**:
+   - Header text: "[exact text]"
+   - Button labels: "[exact text]"
+   - Input placeholders: "[exact text]"
+   - Body text: "[exact text]"
+   - Footer links: "[exact text]", "[exact text]", "[exact text]"
+   - Any other visible text: "[exact text]"
 
-1. **Exact Measurements & Layout**:
-   - Overall canvas/viewport size (if discernible)
-   - Precise spacing values (margins, padding) in pixels or relative units
-   - Exact element positioning (centered, top-left at X,Y, etc.)
-   - Grid columns and gaps if applicable
-   - Header height, footer height, content area dimensions
-   - Container max-width and centering
+**2. VISUAL ELEMENTS (Only what's shown)**:
+   - List each component: header, form, button, image, footer, etc.
+   - Position: top, center, bottom-left, etc.
+   - Approximate size/proportions
 
-2. **All Visual Elements** (Do NOT add elements not in the image):
-   - List ONLY components visible in the image
-   - Exact text content (word-for-word)
-   - Component sizes (width x height where measurable)
-   - Element hierarchy and nesting structure
-   - Z-index layering if elements overlap
+**3. LAYOUT & SPACING**:
+   - Container: centered, max-width __px
+   - Spacing scale: 8px, 16px, 24px, etc.
+   - Element arrangement: vertical stack, grid, etc.
 
-3. **Exact Colors** (use hex codes if possible):
-   - Background colors (main page, sections, components)
-   - Text colors (headers, body, links, labels)
-   - Border colors
-   - Shadow colors and opacity
-   - Button/interactive element colors (default, hover if shown)
+**4. COLORS** (hex codes):
+   - Background: #______
+   - Text: #______
+   - Accents/buttons: #______
+   - Borders: #______
 
-4. **Typography Details**:
-   - Font families (or closest web-safe alternatives)
-   - Exact font sizes in px/rem for each text element
-   - Font weights (regular, medium, bold, etc.)
-   - Line heights and letter spacing
-   - Text alignment (left, center, right)
+**5. TYPOGRAPHY**:
+   - Font sizes: header __px, body __px, etc.
+   - Font weights: bold, normal, etc.
 
-5. **Spacing System**:
-   - Identify consistent spacing scale (8px, 16px, 24px, etc.)
-   - Margins between sections
-   - Padding inside components
-   - Gap between related elements
+**6. TECH STACK**:
+   - Simple sketch → vanilla HTML/CSS/JS
+   - Complex app → React/Next.js
+   - Justify recommendation
 
-6. **Borders, Shadows & Effects**:
-   - Border thickness, style (solid/dashed), radius
-   - Box shadows (offset-x, offset-y, blur, spread, color)
-   - Any gradients, patterns, or textures
-   - Opacity/transparency values
+**7. FUNCTIONALITY**:
+   - What should happen when user interacts?
+   - Email signup form?
+   - mailto: link?
+   - Smiley face animation?
 
-7. **Simple Implementation Approach**:
-   - Recommend the SIMPLEST tech stack that can achieve this design
-   - For simple sketches: prefer vanilla HTML/CSS/JS over frameworks
-   - For complex apps: suggest React/Next.js/etc.
-   - Identify if any animations/interactions are shown
-   - Note responsive breakpoints if multiple device views shown
+CRITICAL RULES:
+- Extract ALL text word-for-word (this is the #1 priority!)
+- List ONLY elements shown in image
+- Use exact hex colors if discernible
+- Recommend simplest tech that works
+- No vague terms - use numbers
 
-8. **Validation Checklist** (for implementation agent):
-   - ✓ All elements from sketch are present
-   - ✓ No extra elements added
-   - ✓ Colors match exactly
-   - ✓ Spacing matches the visual proportions
-   - ✓ Layout structure matches (grid, flexbox, positioning)
-   - ✓ Text content is word-for-word accurate
+Example output start:
+"**1. TEXT CONTENT:**
+- Header: 'BLAKE Inc.'
+- Input placeholder: 'Your email'
+- Button: 'Sign Up'
+- Footer left: 'Disclaimer'
+- Footer center: 'Email'
+- Footer right: 'Social Media'
 
-Provide a comprehensive technical specification with EXACT values wherever possible. Avoid vague terms like "medium padding" - use "24px padding" instead."""
+**2. VISUAL ELEMENTS:**
+- Header (top, centered): company name
+- Hero section (center): email input + signup button...
+"""
 
         return prompt
 
