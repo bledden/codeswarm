@@ -371,10 +371,14 @@ async def main():
 
                             print(f"\n  🚀 Creating GitHub repository...")
 
-                            # Get files from output directory
+                            # Get files from implementation output
                             output_files = {}
-                            if 'files' in result:
-                                output_files = result['files']
+                            if 'implementation' in result and 'parsed_files' in result['implementation']:
+                                output_files = result['implementation']['parsed_files']
+                                print(f"  📄 Found {len(output_files)} files to commit")
+                            else:
+                                print(f"  ⚠️  No parsed_files found in result!")
+                                print(f"  Result keys: {list(result.keys())}")
 
                             github_result = await github.create_and_push_repository(
                                 repo_name=repo_name,
