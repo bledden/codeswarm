@@ -140,6 +140,23 @@ class DaytonaClient:
 
                     logger.info(f"[DAYTONA]  Created workspace: {name} (id: {workspace['id']})")
                     return workspace
+                elif response.status == 403:
+                    # Storage limit or quota exceeded
+                    error_text = await response.text()
+
+                    # Parse error for helpful message
+                    if "disk limit exceeded" in error_text.lower() or "storage" in error_text.lower():
+                        logger.error(f"[DAYTONA]  💾 Storage limit exceeded!")
+                        logger.error(f"[DAYTONA]  ")
+                        logger.error(f"[DAYTONA]  Quick fixes:")
+                        logger.error(f"[DAYTONA]    1. Archive unused sandboxes: https://app.daytona.io/dashboard")
+                        logger.error(f"[DAYTONA]    2. Delete old workspaces to free up space")
+                        logger.error(f"[DAYTONA]    3. Upgrade tier for more storage: https://app.daytona.io/dashboard/limits")
+                        logger.error(f"[DAYTONA]  ")
+                        raise Exception(f"Daytona storage limit exceeded. Archive unused sandboxes at https://app.daytona.io/dashboard")
+                    else:
+                        logger.error(f"[DAYTONA]  Failed to create workspace (HTTP 403 Forbidden): {error_text}")
+                        raise Exception(f"Permission denied: {error_text}")
                 else:
                     error = await response.text()
                     logger.error(f"[DAYTONA]  Failed to create workspace (HTTP {response.status}): {error}")
