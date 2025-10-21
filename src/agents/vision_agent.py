@@ -155,14 +155,56 @@ Provide a comprehensive technical specification that architecture and implementa
         ]
 
         import time
-        start_time = time.time()
+        import asyncio
 
-        response = await self.client.complete(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
-        )
+        # Retry logic for transient errors (HTTP 200 with errors, 429, 500, 502, 503, 504)
+        max_retries = 3
+        retry_delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            start_time = time.time()
+
+            try:
+                response = await self.client.complete(
+                    model=self.model,
+                    messages=messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+
+                latency_ms = int((time.time() - start_time) * 1000)
+
+                # Check for successful response
+                if "choices" in response and response["choices"]:
+                    message = response["choices"][0].get("message", {})
+                    content = message.get("content", "")
+                    if content:
+                        # Success! Break out of retry loop
+                        break
+
+                # Empty response - might be transient
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"[{self.name.upper()}] ⚠️  Empty response (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                    continue
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check if this is a transient error (HTTP 200 with error, rate limit, server error)
+                is_transient = any(code in error_msg for code in ["200", "429", "500", "502", "503", "504", "timeout", "Timeout"])
+
+                if is_transient and attempt < max_retries - 1:
+                    wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"[{self.name.upper()}] ⚠️  Transient error (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                    print(f"[{self.name.upper()}]  Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    # Non-transient error or final retry - re-raise
+                    print(f"[{self.name.upper()}] ❌ Vision analysis failed after {attempt + 1} attempts: {error_msg}")
+                    raise
 
         latency_ms = int((time.time() - start_time) * 1000)
 
