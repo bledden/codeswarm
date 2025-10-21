@@ -120,36 +120,70 @@ class GitHubClient:
                 check=True
             )
 
-            # Configure git user (required for commits)
+            # Configure git user using GitHub CLI authenticated user
+            # Get user's GitHub username and email from gh CLI
+            gh_user = subprocess.run(
+                ["gh", "api", "user", "-q", ".login"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            gh_email = subprocess.run(
+                ["gh", "api", "user/emails", "-q", '.[0].email'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            username = gh_user.stdout.strip() if gh_user.returncode == 0 else "CodeSwarm"
+            email = gh_email.stdout.strip() if gh_email.returncode == 0 else f"{username}@users.noreply.github.com"
+
+            # Configure git with authenticated user's identity
             subprocess.run(
-                ["git", "config", "user.name", "CodeSwarm"],
+                ["git", "config", "user.name", username],
                 cwd=temp_dir,
                 capture_output=True,
                 check=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "codeswarm@localhost"],
+                ["git", "config", "user.email", email],
                 cwd=temp_dir,
                 capture_output=True,
                 check=True
             )
 
+            logger.info(f"[GITHUB]  Configured git identity: {username} <{email}>")
+
             # Add all files
-            subprocess.run(
+            add_result = subprocess.run(
                 ["git", "add", "."],
                 cwd=temp_dir,
                 capture_output=True,
+                text=True,
                 check=True
             )
+            logger.debug(f"[GITHUB]  git add output: {add_result.stdout or 'empty'}")
+
+            # Verify files were added
+            status_result = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=temp_dir,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"[GITHUB]  Files staged: {len(status_result.stdout.splitlines())} files")
 
             # Create commit
             commit_msg = f"Initial commit: {task if task else description}\n\n🤖 Generated with CodeSwarm"
-            subprocess.run(
+            commit_result = subprocess.run(
                 ["git", "commit", "-m", commit_msg],
                 cwd=temp_dir,
                 capture_output=True,
+                text=True,
                 check=True
             )
+            logger.info(f"[GITHUB]  Commit created successfully")
 
             # Create GitHub repository
             visibility = "--private" if private else "--public"
@@ -192,8 +226,11 @@ class GitHubClient:
             }
 
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.decode() if e.stderr else str(e)
+            # Extract error message from stderr (already text since we used text=True)
+            error_msg = e.stderr if e.stderr else (e.stdout if e.stdout else str(e))
             logger.error(f"[GITHUB]  Git command failed: {error_msg}")
+            logger.error(f"[GITHUB]  Command: {' '.join(e.cmd)}")
+            logger.error(f"[GITHUB]  Return code: {e.returncode}")
             return {
                 "success": False,
                 "error": error_msg,
