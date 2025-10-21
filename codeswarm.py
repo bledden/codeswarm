@@ -470,6 +470,17 @@ async def main():
         except Exception as e:
             print(f"  ⚠️  Feedback error: {e}\n")
 
+    # Cleanup: Close all aiohttp sessions
+    try:
+        if openrouter and hasattr(openrouter, 'close'):
+            await openrouter.close()
+        if daytona and hasattr(daytona, 'close'):
+            await daytona.close()
+        if tavily and hasattr(tavily, 'close'):
+            await tavily.close()
+    except Exception:
+        pass  # Silent cleanup - don't show errors to user
+
     print("✨ Thank you for using CodeSwarm!")
     print()
 
