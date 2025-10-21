@@ -144,9 +144,14 @@ python3.11 codeswarm.py --task "Create a REST API for user authentication"
 # Generate from a sketch/image
 python3.11 codeswarm.py --task "Build a todo app" --image sketch.png
 
+# Configure RAG pattern limit (default: 5, recommended by research)
+python3.11 codeswarm.py --task "Build microservices" --rag-limit 10
+
 # View help
 python3.11 codeswarm.py --help
 ```
+
+> 📖 **Advanced**: Configure RAG pattern retrieval limits and understand the research-backed default of 5 patterns: [docs/RAG_CONFIGURATION.md](docs/RAG_CONFIGURATION.md)
 
 ### Example Session with New Features
 
