@@ -131,7 +131,8 @@ class FullCodeSwarmWorkflow:
         user_id: Optional[str] = None,
         image_path: Optional[str] = None,
         scrape_docs: bool = True,
-        deploy: bool = False
+        deploy: bool = False,
+        rag_pattern_limit: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Execute full CodeSwarm workflow
@@ -142,6 +143,7 @@ class FullCodeSwarmWorkflow:
             image_path: Path to image for vision analysis (optional)
             scrape_docs: Whether to scrape documentation (default: True)
             deploy: Whether to deploy to Daytona (default: False)
+            rag_pattern_limit: Number of similar patterns to retrieve (default: 5, RAG best practice)
 
         Returns:
             Dict with generated code, scores, and metadata
@@ -165,10 +167,13 @@ class FullCodeSwarmWorkflow:
         # Step 2: RAG Pattern Retrieval (if Neo4j available)
         rag_patterns = []
         if self.neo4j:
-            print("[2/8] 🗄️  Retrieving similar patterns from Neo4j...")
+            # Use provided limit or default to 5 (RAG best practice)
+            # Research shows top 3-5 similar examples provide optimal context without overwhelming the model
+            pattern_limit = rag_pattern_limit if rag_pattern_limit is not None else 5
+            print(f"[2/8] 🗄️  Retrieving similar patterns from Neo4j (limit: {pattern_limit})...")
             rag_patterns = await self.neo4j.retrieve_similar_patterns(
                 task=task,
-                limit=5,
+                limit=pattern_limit,
                 min_score=self.quality_threshold
             )
             print(f"      ✅ Retrieved {len(rag_patterns)} patterns (90+ quality)\n")

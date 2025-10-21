@@ -62,6 +62,13 @@ Examples:
         help='Path to image file for vision-based generation (optional, overrides path in task)'
     )
 
+    parser.add_argument(
+        '--rag-limit',
+        type=int,
+        default=None,
+        help='Number of similar patterns to retrieve from Neo4j (default: 5, recommended by RAG best practices)'
+    )
+
     return parser.parse_args()
 
 
@@ -213,7 +220,8 @@ async def main():
         user_id="demo-user",
         image_path=image_path,
         scrape_docs=True,
-        deploy=True  # Auto-deploy by default
+        deploy=True,  # Auto-deploy by default
+        rag_pattern_limit=args.rag_limit  # User-configurable RAG pattern limit
     )
 
     # Display results
