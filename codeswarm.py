@@ -14,6 +14,8 @@ import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 import weave
+from datetime import datetime
+import time
 
 # Load environment
 load_dotenv()
@@ -134,9 +136,15 @@ async def main():
     print("=" * 80)
     print("  Starting Code Generation")
     print("=" * 80)
+
+    # Track session start time
+    session_start_time = time.time()
+    start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"⏰ Session started: {start_timestamp}")
     print()
 
     # Initialize services
+    init_start = time.time()
     print("🔧 Initializing services...")
     services_initialized = []
 
@@ -195,6 +203,9 @@ async def main():
         print(f"  ⚠️  Tavily unavailable")
 
     print(f"\n🎯 {len(services_initialized)}/6 services active")
+
+    init_duration = time.time() - init_start
+    print(f"⏱️  Initialization took {init_duration:.2f}s")
     print()
 
     # Create workflow
@@ -213,6 +224,9 @@ async def main():
     print("=" * 80)
     print("  GENERATING CODE")
     print("=" * 80)
+    workflow_start = time.time()
+    workflow_start_timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"⏰ Workflow started: {workflow_start_timestamp}")
     print()
 
     result = await workflow.execute(
@@ -225,10 +239,14 @@ async def main():
     )
 
     # Display results
+    workflow_duration = time.time() - workflow_start
     print()
     print("=" * 80)
     print("  ✅ CODE GENERATION COMPLETE!")
     print("=" * 80)
+    completion_timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"⏰ Completed: {completion_timestamp}")
+    print(f"⏱️  Workflow took {workflow_duration:.2f}s ({workflow_duration/60:.1f} minutes)")
     print()
 
     if result.get('quality_score'):
@@ -480,6 +498,20 @@ async def main():
             await tavily.close()
     except Exception:
         pass  # Silent cleanup - don't show errors to user
+
+    # Session summary
+    total_duration = time.time() - session_start_time
+    end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    print()
+    print("=" * 80)
+    print("  SESSION SUMMARY")
+    print("=" * 80)
+    print(f"⏰ Started:  {start_timestamp}")
+    print(f"⏰ Finished: {end_timestamp}")
+    print(f"⏱️  Total time: {total_duration:.2f}s ({total_duration/60:.1f} minutes)")
+    print("=" * 80)
+    print()
 
     print("✨ Thank you for using CodeSwarm!")
     print()
